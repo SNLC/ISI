@@ -1,0 +1,675 @@
+function kenta_overlaymaps(anim,expt,AltAz,grabnum)
+% anim;
+% expt;
+% AltAz;
+% %% 
+% anim='L39';
+% expt='000_005';
+% AltAz='altitude';
+% AltAz='azimuth';
+
+%grabnum=number of anatomy image. Def=001
+
+%% get files
+Anim=anim;
+Expt=strcat('u',expt);
+Expt1=expt;
+ExptID = strcat(anim,'_',Expt); 
+
+%get analyzer file
+Dir = 'C:\neurodata\AnalyzerFiles\';
+Anadir=[Dir Anim,'\params ',ExptID '.mat'];
+load(Anadir,'Analyzer','-mat')
+
+%get processed data
+pathname='C:\neurodata\Processed Data\';
+filename=strcat(Anim,'_',Expt1,'.mat');
+filepath=strcat(pathname,filename);
+    S = load(filepath);  %Returns the contents in the .mat under the structure S
+    f1m = S.f1m;    %f1m is a cell array with images from each condition
+%one axes hack
+if length(f1m) == 2 
+    f1m{3} = f1m{2};
+    f1m{4} = f1m{3};
+    f1m{2} = f1m{1};
+end
+
+% get anatomy image
+Dir = 'C:\imager_data\';
+Anatdir=[Dir Anim,'\grabs\'];
+D = dir([Anatdir '*.mat']);
+pic=D(grabnum).name;
+filename=strcat(Anatdir, pic);
+image=load(filename);
+anatomypic_orig=image.grab.img;
+
+% anatomyFig=figure;
+% imagesc(anatomypic_orig),colormap(gray)
+%  
+%set lowpass smoothing valuess
+LP=[0,1,1.5,1.5,1];
+%set highpass smoothing values
+HP=[0,30,30,50,0];
+%%
+% if strcmp('azimuth',Analyzer.P.param{12}{3})==1
+if strcmp('azimuth',AltAz)==1
+%% process data for various LP params
+for x=1:length(LP)
+if LP(x)==0
+    L=[];
+    bw = ones(size(f1m{1}));
+else
+L = fspecial('gaussian',15,LP(x));  %make LP spatial filter
+bw = ones(size(f1m{1}));
+end
+if HP(x)==0
+    H=[];
+else
+    sizedum = 2.5*HP(x);
+    H = -fspecial('gaussian',sizedum,HP(x));
+    H(round(sizedum/2),round(sizedum/2)) = 1+H(round(sizedum/2),round(sizedum/2));
+end
+
+[kmap_hor kmap_vert delay_hor delay_ver magS] = Gprocesskret_batch(f1m,bw,L,H);
+
+xsize = Analyzer.P.param{10}{3};
+horscfactor = xsize/360;
+kmap_hor1 = kmap_hor*horscfactor; %puts kmap into eccentricity values instead of phase
+
+kmap_hor1 = fliplr(kmap_hor1);
+kmap_hor1 = rot90(kmap_hor1);
+kmap_hor1 = rot90(kmap_hor1);
+kmap_hor1 = rot90(kmap_hor1);
+
+   
+% if x==2 %overlay only for 2 LP smoothing
+anatomypic=anatomypic_orig;   
+anatomypic = fliplr(anatomypic);
+anatomypic = rot90(anatomypic);
+anatomypic = rot90(anatomypic);
+anatomypic = rot90(anatomypic);
+
+%normalize anatomy picture and make between 1 and 64 (to match colormap
+%indices)
+anatomypic=double(anatomypic);
+anatomypic = anatomypic-min(anatomypic(:));
+anatomypic = anatomypic/max(anatomypic(:));
+anatomypic = round(anatomypic*63+1);
+
+%normalize kmap_hor1 and make between 1 and 64 (to match colormap indices)
+kmap_hor_overlay=kmap_hor1;
+kmap_hor_overlay = kmap_hor_overlay-min(kmap_hor_overlay(:));
+kmap_hor_overlay = kmap_hor_overlay/max(kmap_hor_overlay(:));
+kmap_hor_overlay = round(kmap_hor_overlay*63+1);
+
+ratio=.2;
+aw = 1-ratio;  %anatomy weight of image (scalar)
+fw = ratio;  %anatomy weight of image (scalar)
+
+grayid = gray;
+hsvid = hsv;
+
+dim = size(kmap_hor_overlay);
+
+for i = 1:dim(1)
+    for j = 1:dim(2)
+        overlay(i,j,:) = fw*hsvid(kmap_hor_overlay(i,j),:) + aw*grayid(anatomypic(i,j),:);       
+    end
+end
+overlay = overlay/max(overlay(:));
+
+Anatomy=figure('Name','  Anatomy','NumberTitle','off');
+    imagesc(anatomypic)
+    colormap gray 
+    title(strcat(ExptID,' Anatomy '),'FontSize',12,'Interpreter','none');
+    set(gca,'FontName','arial');
+    set(gcf,'Color','w')
+    axis equal
+    axis tight
+ 
+HorizRet1=figure('Name','  Horizontal Retinotopy Overlay','NumberTitle','off');
+    imagesc(overlay)
+    title(strcat(ExptID,' Horizontal Retinotopy Overlay-LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',12,'Interpreter','none');
+    set(gca,'FontName','arial');
+    set(gcf,'Color','w')
+    axis equal
+    axis tight
+    
+HorizRet2=figure('Name','  Horizontal Retinotopy','NumberTitle','off');
+    imagesc(kmap_hor1)
+    title(strcat(ExptID,' Horizontal Retinotopy -LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',12,'Interpreter','none');
+    set(gca,'FontName','arial');
+    set(gcf,'Color','w')
+    colormap hsv
+    axis equal
+    axis tight
+    
+    %% save overlay
+    Root_AnalDir = 'C:\Analyzed Data_ISI\';
+    AnalDir = strcat(Root_AnalDir,Anim,'\Overlays\');
+    filename5 = strcat(ExptID,'_HorizRet1_LP',num2str(LP(x)),'_HP ',num2str(HP(x)));
+    filename8 = strcat(ExptID,'_HorizRet2_LP',num2str(LP(x)),'_HP ',num2str(HP(x)));
+    filename9 = strcat(ExptID,'_HorizAnatomy');
+    if iscell(AnalDir)
+        AnalDir=AnalDir{1};
+    end
+    if exist(AnalDir) == 0
+        mkdir(AnalDir)
+    end
+        saveas(HorizRet1,strcat(AnalDir,filename5,'.tif'))
+        saveas(HorizRet1,strcat(AnalDir,filename5,'.fig'))
+        saveas(HorizRet2,strcat(AnalDir,filename8,'.tif'))
+        saveas(HorizRet2,strcat(AnalDir,filename8,'.fig')) 
+        saveas(Anatomy,strcat(AnalDir,filename9,'.tif'))
+        saveas(Anatomy,strcat(AnalDir,filename9,'.fig'))
+        
+% %% plot threshold maps
+% mag = magS.hor; %mag=response magnitude for each pixel
+% ang = kmap_hor; %ang=phase of each pixel. 
+% 
+% %put kmap in ecc values instead of phase
+% xsize = Analyzer.P.param{10}{3};
+% horscfactor = xsize/360;
+% kmap_hor_ecc = kmap_hor*horscfactor; %puts kmap into eccentricity values instead of phase
+% 
+% ang_orig=ang;
+% mag_orig=mag; %save original magnitude image before filtering and thresholding
+% 
+% ang=kmap_hor_ecc;%scale angle values to be ecc instead of phase
+% 
+% %filter 
+% h = fspecial('gaussian',size(mag),1.5);
+% h = abs(fft2(h));
+% magf = ifft2(h.*fft2(mag));
+% 
+% %normalize 
+% mag = magf.^1.1; % increase difference in values in mag to separate 
+% mag = mag-min(mag(:));
+% mag = mag/max(mag(:)); % normalize mag from 0 (min value) to 1 (max value)
+% 
+% %threshold and make mask of values above threshold
+% magROI=mag; %mag ROI of pixels above threshold
+% thresh = .12;
+% id_belowthresh = find(magROI(:)<thresh);
+% id_abovethresh = find(magROI(:)>=thresh);
+% magROI(id_belowthresh) = NaN;
+% magROI(id_abovethresh) =1;
+% 
+% kmap_thresh=magROI.*kmap_hor_ecc; %make map where pixels above threshold have their ecc value and pixels below thresh are Nans
+% maxval = (max(kmap_thresh(:)));
+% maxval=maxval+1;
+% nanvals=find(isnan(kmap_thresh)); %find nanvalues
+% kmap_thresh(nanvals)=maxval; %assign maxval+1 to NaN values
+%     
+% %flip and rotate mag and ang to orient correctly 
+% ang = fliplr(ang);
+% mag = fliplr(mag);
+% ang = rot90(ang);
+% mag = rot90(mag);
+% ang = rot90(ang);
+% mag = rot90(mag);
+% ang = rot90(ang);
+% mag = rot90(mag);
+% 
+% %flip and orient kmap_thresh to orient correctly
+% kmap_thresh = fliplr(kmap_thresh);
+% kmap_thresh = rot90(kmap_thresh);
+% kmap_thresh = rot90(kmap_thresh);
+% kmap_thresh = rot90(kmap_thresh);
+% 
+% %make threshold colormap so that values less than thresh (now set to maxval+1) are white
+% colormap hsv;
+% cmap=colormap;
+% threshmap=cmap;
+% lastcolor=length(threshmap)+1;
+% threshmap(lastcolor,:) = ([1 1 1]);
+% 
+% %plot thresholded kmap
+% HorizRet_Thresh=figure('Name','Horizontal Retinotopy- Thresholded','NumberTitle','off','OuterPosition',[200, 200, 800, 800]);
+% imagesc(kmap_thresh);
+% title(strcat(ExptID,' Horizontal Retinotopy -LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',14,'Interpreter','none')
+% colormap(threshmap)
+% colorbar('SouthOutside','FontSize',12,'XTick',[-80:20:80])
+% set(gcf,'Color','w');
+% set(gca,'FontName','arial');
+% axis equal
+% axis tight
+% 
+% HorizRet_RespMag=figure('Name','Horizontal Retinotopy- ResponseMagnitude','NumberTitle','off','OuterPosition',[200, 200, 800, 800]);
+% imagesc(ang,'AlphaData',mag);
+% %     imagesc(kmap_hor1,[-80 80])
+% title(strcat(ExptID,' Horizontal Retinotopy -LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',14,'Interpreter','none')
+% colormap hsv;
+% colorbar('SouthOutside','FontSize',12,'XTick',[-80:20:80])
+% set(gcf,'Color','w');
+% set(gca,'FontName','arial');
+% axis equal
+% axis tight
+% 
+% HorizRet=figure('Name','  Horizontal Retinotopy','NumberTitle','off','OuterPosition',[200, 200, 800, 800]);
+%     imagesc(kmap_hor1,[-80 80])
+%     title(strcat(ExptID,' Horizontal Retinotopy -LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',16,'Interpreter','none');
+%     set(gca,'FontName','arial');
+%     set(gcf,'Color','w')
+%     colormap hsv
+%     colorbar('SouthOutside','FontSize',12,'XTick',[-80:20:80])
+%     axis equal
+%     axis tight
+%     
+% 
+%         %% save resp mag and thresh
+% 
+%     %Paths for saving data and plots
+%     Root_AnalDir = 'C:\Analyzed Data_ISI\';
+%     AnalDir = strcat(Root_AnalDir,Anim,'\HorizRet\');
+% %         AnalDir = strcat(Root_AnalDir,Anim{g},'\');
+%     filename2 = strcat(ExptID,'_HorizRetRespMag_LP',num2str(LP(x)),'_HP ',num2str(HP(x)));
+%     filename6 = strcat(ExptID,'_HorizRetThresh_LP',num2str(LP(x)),'_HP ',num2str(HP(x)));
+%     filename1 = strcat(ExptID,'_HorizRetRaw');
+%     if iscell(AnalDir)
+%         AnalDir=AnalDir{1};
+%     end
+%     if exist(AnalDir) == 0
+%         mkdir(AnalDir)
+%     end
+%         saveas(HorizRet,strcat(AnalDir,filename1,'.tif'))
+%         saveas(HorizRet,strcat(AnalDir,filename1,'.fig'))
+%         HorizRetfilename=strcat(AnalDir,filename1,'.eps');
+%         h = figure(HorizRet);
+%         print (h, '-depsc2', HorizRetfilename);
+%         
+%         saveas(HorizRet_RespMag,strcat(AnalDir,filename2,'.tif'))
+%         saveas(HorizRet_RespMag,strcat(AnalDir,filename2,'.fig'))
+%         saveas(HorizRet_RespMag,strcat(AnalDir,filename2,'.eps'))
+%         HorizRet_RespMagfilename=strcat(AnalDir,filename2,'.eps');
+%         h = figure(HorizRet_RespMag);
+%         print (h, '-depsc2', HorizRet_RespMagfilename);
+%         
+%         saveas(HorizRet_Thresh,strcat(AnalDir,filename6,'.tif'))
+%         saveas(HorizRet_Thresh,strcat(AnalDir,filename6,'.fig'))
+%         saveas(HorizRet_Thresh,strcat(AnalDir,filename6,'.eps'))
+%         HorizRet_Threshfilename=strcat(AnalDir,filename6,'.eps');
+%         h = figure(HorizRet_Thresh);
+%         print (h, '-depsc2', HorizRet_Threshfilename);
+%            
+end
+%%
+%set lowpass smoothing valuess
+LP=[2,3];
+%set highpass smoothing values
+HP=[0,0];
+%% process data for various LP params
+for x=1:length(LP)
+if LP(x)==0
+    L=[];
+    bw = ones(size(f1m{1}));
+else
+L = fspecial('gaussian',15,LP(x));  %make LP spatial filter
+bw = ones(size(f1m{1}));
+end
+if HP(x)==0
+    H=[];
+else
+    sizedum = 2.5*HP(x);
+    H = -fspecial('gaussian',sizedum,HP(x));
+    H(round(sizedum/2),round(sizedum/2)) = 1+H(round(sizedum/2),round(sizedum/2));
+end
+
+[kmap_hor kmap_vert delay_hor delay_ver magS] = Gprocesskret_batch(f1m,bw,L,H);
+
+xsize = Analyzer.P.param{10}{3};
+horscfactor = xsize/360;
+kmap_hor1 = kmap_hor*horscfactor; %puts kmap into eccentricity values instead of phase
+
+kmap_hor1 = fliplr(kmap_hor1);
+kmap_hor1 = rot90(kmap_hor1);
+kmap_hor1 = rot90(kmap_hor1);
+kmap_hor1 = rot90(kmap_hor1);
+
+HorizRetContour=figure('Name','  Horizontal Retinotopy','NumberTitle','off','OuterPosition',[200, 200, 800, 800]);
+    contour(kmap_hor1,[-80:20:80],'LineWidth',2)
+    title(strcat(ExptID,' Horizontal Retinotopy -LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',16,'Interpreter','none');
+    set(gca,'FontName','arial');
+    set(gcf,'Color','w')
+    colormap hsv
+%     colormap(flipud(hsv)) 
+    colorbar('SouthOutside','FontSize',12,'XTick',[-80:20:80])
+    axis ij
+    axis equal
+    axis tight
+    
+    %% save contour
+        Root_AnalDir = 'C:\Analyzed Data_ISI\';
+        AnalDir = strcat(Root_AnalDir,Anim,'\HorizRet\');
+        if iscell(AnalDir)
+        AnalDir=AnalDir{1};
+        end
+        if exist(AnalDir) == 0
+        mkdir(AnalDir)
+        end
+        filename66 = strcat(ExptID,'_HorizRetContour',num2str(LP(x)),'_HP ',num2str(HP(x)));
+        
+        saveas(HorizRetContour,strcat(AnalDir,filename66,'.tif'))
+        saveas(HorizRetContour,strcat(AnalDir,filename66,'.fig'))
+        HorizRetContourfilename=strcat(AnalDir,filename66,'.eps');
+        h = figure(HorizRetContour);
+        print (h, '-depsc2', HorizRetContourfilename);
+       
+end
+%%
+%close all
+end
+
+
+
+%%  Vert Ret 
+% if strcmp('altitude',Analyzer.P.param{12}{3})==1
+if strcmp('altitude',AltAz)==1
+%% process data for various LP params
+for x=1:length(LP)
+if LP(x)==0
+    L=[];
+    bw = ones(size(f1m{1}));
+else
+L = fspecial('gaussian',15,LP(x));  %make LP spatial filter
+bw = ones(size(f1m{1}));
+end
+if HP(x)==0
+    H=[];
+else
+    sizedum = 2.5*HP(x);
+    H = -fspecial('gaussian',sizedum,HP(x));
+    H(round(sizedum/2),round(sizedum/2)) = 1+H(round(sizedum/2),round(sizedum/2));
+    
+end
+
+[kmap_hor kmap_vert delay_hor delay_ver magS] = Gprocesskret_batch(f1m,bw,L,H);
+
+ysize = Analyzer.P.param{11}{3};
+vertscfactor = ysize/360;
+kmap_vert1 = kmap_vert*vertscfactor; %puts kmap into eccentricity values instead of phase
+
+kmap_vert1 = fliplr(kmap_vert1);
+kmap_vert1 = rot90(kmap_vert1);
+kmap_vert1 = rot90(kmap_vert1);
+kmap_vert1 = rot90(kmap_vert1);
+
+   
+% if x==2 %overlay only for 2 LP smoothing
+anatomypic=anatomypic_orig;   
+anatomypic = fliplr(anatomypic);
+anatomypic = rot90(anatomypic);
+anatomypic = rot90(anatomypic);
+anatomypic = rot90(anatomypic);
+
+%normalize anatomy picture and make between 1 and 64 (to match colormap
+%indices)
+anatomypic=double(anatomypic);
+anatomypic = anatomypic-min(anatomypic(:));
+anatomypic = anatomypic/max(anatomypic(:));
+anatomypic = round(anatomypic*63+1);
+
+%normalize kmap_vert1 and make between 1 and 64 (to match colormap indices)
+kmap_vert_overlay=kmap_vert1;
+kmap_vert_overlay = kmap_vert_overlay-min(kmap_vert_overlay(:));
+kmap_vert_overlay = kmap_vert_overlay/max(kmap_vert_overlay(:));
+kmap_vert_overlay = round(kmap_vert_overlay*63+1);
+
+ratio=.2;
+aw = 1-ratio;  %anatomy weight of image (scalar)
+fw = ratio;  %anatomy weight of image (scalar)
+
+grayid = gray;
+hsvid = hsv;
+
+dim = size(kmap_vert_overlay);
+
+for i = 1:dim(1)
+    for j = 1:dim(2)
+        overlay(i,j,:) = fw*hsvid(kmap_vert_overlay(i,j),:) + aw*grayid(anatomypic(i,j),:);       
+    end
+end
+overlay = overlay/max(overlay(:));
+
+Anatomy=figure('Name','  Anatomy','NumberTitle','off');
+    imagesc(anatomypic)
+    colormap gray 
+    title(strcat(ExptID,' Anatomy '),'FontSize',12,'Interpreter','none');
+    set(gca,'FontName','arial');
+    set(gcf,'Color','w')
+    axis equal
+    axis tight
+ 
+VertRet1=figure('Name','  Vertontal Retinotopy Overlay','NumberTitle','off');
+    imagesc(overlay)
+    title(strcat(ExptID,' Vertical Retinotopy Overlay-LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',12,'Interpreter','none');
+    set(gca,'FontName','arial');
+    set(gcf,'Color','w')
+    axis equal
+    axis tight
+    
+VertRet2=figure('Name','  Vertical Retinotopy','NumberTitle','off');
+    imagesc(kmap_vert1)
+    title(strcat(ExptID,' Vertical Retinotopy -LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',12,'Interpreter','none');
+    set(gca,'FontName','arial');
+    set(gcf,'Color','w')
+    colormap hsv
+    axis equal
+    axis tight
+    
+    %% save overlay
+    Root_AnalDir = 'C:\Analyzed Data_ISI\';
+    AnalDir = strcat(Root_AnalDir,Anim,'\Overlays\');
+    filename5 = strcat(ExptID,'_VertRet1_LP',num2str(LP(x)),'_HP ',num2str(HP(x)));
+    filename8 = strcat(ExptID,'_VertRet2_LP',num2str(LP(x)),'_HP ',num2str(HP(x)));
+    filename9 = strcat(ExptID,'_VertAnatomy');
+    if iscell(AnalDir)
+        AnalDir=AnalDir{1};
+    end
+    if exist(AnalDir) == 0
+        mkdir(AnalDir)
+    end
+        saveas(VertRet1,strcat(AnalDir,filename5,'.tif'))
+        saveas(VertRet1,strcat(AnalDir,filename5,'.fig'))
+        saveas(VertRet2,strcat(AnalDir,filename8,'.tif'))
+        saveas(VertRet2,strcat(AnalDir,filename8,'.fig')) 
+        saveas(Anatomy,strcat(AnalDir,filename9,'.tif'))
+        saveas(Anatomy,strcat(AnalDir,filename9,'.fig'))
+        
+% %% plot threshold maps
+% mag = magS.vert; %mag=response magnitude for each pixel
+% ang = kmap_vert; %ang=phase of each pixel. 
+% 
+% %put kmap in ecc values instead of phase
+% ysize = Analyzer.P.param{11}{3};
+% vertscfactor = ysize/360;
+% kmap_vert_ecc = kmap_vert*vertscfactor; %puts kmap into eccentricity values instead of phase
+% 
+% ang_orig=ang;
+% mag_orig=mag; %save original magnitude image before filtering and thresholding
+% 
+% ang=kmap_vert_ecc;%scale angle values to be ecc instead of phase
+% 
+% %filter 
+% h = fspecial('gaussian',size(mag),1.5);
+% h = abs(fft2(h));
+% magf = ifft2(h.*fft2(mag));
+% 
+% %normalize 
+% mag = magf.^1.1; % increase difference in values in mag to separate 
+% mag = mag-min(mag(:));
+% mag = mag/max(mag(:)); % normalize mag from 0 (min value) to 1 (max value)
+% 
+% %threshold and make mask of values above threshold
+% magROI=mag; %mag ROI of pixels above threshold
+% thresh = .12;
+% id_belowthresh = find(magROI(:)<thresh);
+% id_abovethresh = find(magROI(:)>=thresh);
+% magROI(id_belowthresh) = NaN;
+% magROI(id_abovethresh) =1;
+% 
+% kmap_thresh=magROI.*kmap_vert_ecc; %make map where pixels above threshold have their ecc value and pixels below thresh are Nans
+% maxval = (max(kmap_thresh(:)));
+% maxval=maxval+1;
+% nanvals=find(isnan(kmap_thresh)); %find nanvalues
+% kmap_thresh(nanvals)=maxval; %assign maxval+1 to NaN values
+%     
+% %flip and rotate mag and ang to orient correctly 
+% ang = fliplr(ang);
+% mag = fliplr(mag);
+% ang = rot90(ang);
+% mag = rot90(mag);
+% ang = rot90(ang);
+% mag = rot90(mag);
+% ang = rot90(ang);
+% mag = rot90(mag);
+% 
+% %flip and orient kmap_thresh to orient correctly
+% kmap_thresh = fliplr(kmap_thresh);
+% kmap_thresh = rot90(kmap_thresh);
+% kmap_thresh = rot90(kmap_thresh);
+% kmap_thresh = rot90(kmap_thresh);
+% 
+% %make threshold colormap so that values less than thresh (now set to maxval+1) are white
+% colormap hsv;
+% cmap=colormap;
+% threshmap=cmap;
+% lastcolor=length(threshmap)+1;
+% threshmap(lastcolor,:) = ([1 1 1]);
+% 
+% %plot thresholded kmap
+% VertRet_Thresh=figure('Name','Vertical Retinotopy- Thresholded','NumberTitle','off','OuterPosition',[200, 200, 800, 800]);
+% imagesc(kmap_thresh);
+% title(strcat(ExptID,' Vertical Retinotopy -LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',14,'Interpreter','none')
+% colormap(threshmap)
+% colorbar('EastOutside','FontSize',12)
+% set(gcf,'Color','w');
+% set(gca,'FontName','arial');
+% axis equal
+% axis tight
+% 
+% VertRet_RespMag=figure('Name','Vertical Retinotopy- ResponseMagnitude','NumberTitle','off','OuterPosition',[200, 200, 800, 800]);
+% imagesc(ang,'AlphaData',mag);
+% %     imagesc(kmap_vert1)
+% title(strcat(ExptID,' Vertical Retinotopy -LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',14,'Interpreter','none')
+% colormap hsv;
+% colorbar('EastOutside','FontSize',12)
+% set(gcf,'Color','w');
+% set(gca,'FontName','arial');
+% axis equal
+% axis tight
+% 
+% VertRet=figure('Name','  Vertical Retinotopy','NumberTitle','off','OuterPosition',[200, 200, 800, 800]);
+%     imagesc(kmap_vert1)
+%     title(strcat(ExptID,' Vertical Retinotopy -LP ',num2str(LP(x))),'FontSize',16,'Interpreter','none');
+%     set(gca,'FontName','arial');
+%     set(gcf,'Color','w')
+%     colormap hsv
+%     colorbar('EastOutside','FontSize',12)
+%     axis equal
+%     axis tight
+%     
+% 
+%         %% save resp mag and thresh
+% 
+%     %Paths for saving data and plots
+%     Root_AnalDir = 'C:\Analyzed Data_ISI\';
+%     AnalDir = strcat(Root_AnalDir,Anim,'\VertRet\');
+% %         AnalDir = strcat(Root_AnalDir,Anim{g},'\');
+%     filename2 = strcat(ExptID,'_VertRetRespMag_LP',num2str(LP(x)),'_HP ',num2str(HP(x)));
+%     filename6 = strcat(ExptID,'_VertRetThresh_LP',num2str(LP(x)),'_HP ',num2str(HP(x)));
+%     filename1 = strcat(ExptID,'_VertRetRaw');
+%     if iscell(AnalDir)
+%         AnalDir=AnalDir{1};
+%     end
+%     if exist(AnalDir) == 0
+%         mkdir(AnalDir)
+%     end
+%         saveas(VertRet,strcat(AnalDir,filename1,'.tif'))
+%         saveas(VertRet,strcat(AnalDir,filename1,'.fig'))
+%         VertRetfilename=strcat(AnalDir,filename1,'.eps');
+%         h = figure(VertRet);
+%         print (h, '-depsc2', VertRetfilename);
+%         
+%         saveas(VertRet_RespMag,strcat(AnalDir,filename2,'.tif'))
+%         saveas(VertRet_RespMag,strcat(AnalDir,filename2,'.fig'))
+%         saveas(VertRet_RespMag,strcat(AnalDir,filename2,'.eps'))
+%         VertRet_RespMagfilename=strcat(AnalDir,filename2,'.eps');
+%         h = figure(VertRet_RespMag);
+%         print (h, '-depsc2', VertRet_RespMagfilename);
+%         
+%         saveas(VertRet_Thresh,strcat(AnalDir,filename6,'.tif'))
+%         saveas(VertRet_Thresh,strcat(AnalDir,filename6,'.fig'))
+%         saveas(VertRet_Thresh,strcat(AnalDir,filename6,'.eps'))
+%         VertRet_Threshfilename=strcat(AnalDir,filename6,'.eps');
+%         h = figure(VertRet_Thresh);
+%         print (h, '-depsc2', VertRet_Threshfilename);
+%            
+end
+%%
+%set lowpass smoothing valuess
+LP=[2,3];
+%set highpass smoothing values
+HP=[0,0];
+%% process data for various LP params
+for x=1:length(LP)
+if LP(x)==0
+    L=[];
+    bw = ones(size(f1m{1}));
+else
+L = fspecial('gaussian',15,LP(x));  %make LP spatial filter
+bw = ones(size(f1m{1}));
+end
+if HP(x)==0
+    H=[];
+else
+    sizedum = 2.5*HP(x);
+    H = -fspecial('gaussian',sizedum,HP(x));
+    H(round(sizedum/2),round(sizedum/2)) = 1+H(round(sizedum/2),round(sizedum/2));
+end
+
+[kmap_hor kmap_vert delay_hor delay_ver magS] = Gprocesskret_batch(f1m,bw,L,H);
+
+ysize = Analyzer.P.param{11}{3};
+vertscfactor = ysize/360;
+kmap_vert1 = kmap_vert*vertscfactor; %puts kmap into eccentricity values instead of phase
+
+kmap_vert1 = fliplr(kmap_vert1);
+kmap_vert1 = rot90(kmap_vert1);
+kmap_vert1 = rot90(kmap_vert1);
+kmap_vert1 = rot90(kmap_vert1);
+
+VertRetContour=figure('Name','  Vertical Retinotopy','NumberTitle','off','OuterPosition',[200, 200, 800, 800]);
+    contour(kmap_vert1,[-30:10:70],'LineWidth',2)
+    title(strcat(ExptID,' Vertical Retinotopy -LP ',num2str(LP(x)),'_HP ',num2str(HP(x))),'FontSize',16,'Interpreter','none');
+    set(gca,'FontName','arial');
+    set(gcf,'Color','w')
+    colormap hsv
+%     colormap(flipud(hsv)) 
+    colorbar('EastOutside','FontSize',12,'YTick',[-30:10:70])
+    axis ij
+    axis equal
+    axis tight
+    
+    %% save contour
+        Root_AnalDir = 'C:\Analyzed Data_ISI\';
+        AnalDir = strcat(Root_AnalDir,Anim,'\VertRet\');
+        if iscell(AnalDir)
+        AnalDir=AnalDir{1};
+        end
+        if exist(AnalDir) == 0
+        mkdir(AnalDir)
+        end
+        filename66 = strcat(ExptID,'_VertRetContour',num2str(LP(x)),'_HP ',num2str(HP(x)));
+        
+        saveas(VertRetContour,strcat(AnalDir,filename66,'.tif'))
+        saveas(VertRetContour,strcat(AnalDir,filename66,'.fig'))
+        VertRetContourfilename=strcat(AnalDir,filename66,'.eps');
+        h = figure(VertRetContour);
+        print (h, '-depsc2', VertRetContourfilename);
+       
+end
+%%
+close all
+end
+end
