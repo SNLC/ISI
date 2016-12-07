@@ -17,4 +17,4 @@ At the command line, use "getAreaBorders." Add the other files to your path for 
 
 **About**
 
-For more information, see Juavinett, Nauhaus, Garrett, & Callaway (2016) Automated identification of mouse visual areas with intrinsic signal imaging. <i>Nature Protocols.</i> http://www.nature.com/nprot/journal/v12/n1/abs/nprot.2016.158.html
+For more information, see Juavinett, Nauhaus, Garrett, Zhuang, & Callaway (2017) Automated identification of mouse visual areas with intrinsic signal imaging. <i>Nature Protocols.</i> http://www.nature.com/nprot/journal/v12/n1/abs/nprot.2016.158.html
