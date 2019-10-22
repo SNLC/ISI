@@ -1,0 +1,5 @@
+function setISIDataDirectory(path)
+
+global dataLocation
+
+datadir = path;

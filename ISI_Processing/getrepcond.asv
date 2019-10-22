@@ -1,0 +1,5 @@
+function [rep cond] = getcondre(ttag)
+
+global Analyzer
+
+ttag = Analyzer.loops.conds{1}.repeats{1}.timetag;
