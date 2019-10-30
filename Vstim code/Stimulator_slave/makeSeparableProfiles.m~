@@ -1,0 +1,93 @@
+function [amp temp] = makeSeparableProfiles(tdom,sdom,thetax,thetay,pID)
+
+%thetax and thetay are input only in case of 'checker'
+
+Pstruct = getParamStruct;
+
+if pID == 1
+    
+    temp = cos(sdom);  %template image to modulate
+    switch Pstruct.s_profile
+        
+        case 'sin'
+            temp = temp*Pstruct.contrast/100;
+            
+        case 'square'
+            thresh = cos(Pstruct.s_duty*pi);
+            temp = sign(temp-thresh);
+            temp = temp*Pstruct.contrast/100;
+            
+        case 'pulse'
+            thresh = cos(Pstruct.s_duty*pi);
+            temp = (sign(temp-thresh) + 1)/2;
+            temp = temp*Pstruct.contrast/100;
+        case 'checker'
+             sdom = x_ecc*cos(Pstruct.ori*pi/180) - y_ecc*sin(Pstruct.ori*pi/180);    
+            sdom = atan(sdom/Mstate.screenDist)*180/pi;    
+    sdom = sdom*Pstruct.s_freq*2*pi;
+            sdom2 = thetax*cos((Pstruct.ori+90)*pi/180) - thetay*sin((Pstruct.ori+90)*pi/180);
+            temp2 = sin(sdom2);
+            
+            temp = double((sign(temp+eps)+1)/2);
+            temp2 = double((sign(temp2+eps)+1)/2);  %'bitand' won't take 'single' precision
+            temp = (sign(bitand(temp+1,temp2+1)) - .5) * 2;  %-1s and +1s
+            temp = single(temp*Pstruct.contrast/100);
+    end
+    
+    amp = sin(tdom);
+    switch Pstruct.t_profile
+        
+        case 'square'
+            thresh = cos(Pstruct.t_duty*pi);
+            amp = sign(amp-thresh);
+            
+        case 'pulse'
+            thresh = cos(Pstruct.t_duty*pi);
+            amp = (sign(amp-thresh) + 1)/2;
+    end
+    
+    
+    
+elseif pID == 2
+    
+    temp = cos(sdom);  %template image to modulate
+    switch Pstruct.s_profile2
+        
+        case 'sin'
+            temp = temp*Pstruct.contrast2/100;
+            
+        case 'square'
+            thresh = cos(Pstruct.s_duty2*pi);
+            temp = sign(temp-thresh);
+            temp = temp*Pstruct.contrast2/100;
+            
+        case 'pulse'
+            thresh = cos(Pstruct.s_duty2*pi);
+            temp = (sign(temp-thresh) + 1)/2;
+            temp = temp*Pstruct.contrast2/100;
+        case 'checker'
+            %sdom2 = thetax*cos((Pstruct.ori2+90)*pi/180) - thetay*sin((Pstruct.ori2+90)*pi/180);
+            sdom2 = imrotate(sdom,90);
+            temp2 = sin(sdom2);
+            
+            temp = double((sign(temp+eps)+1)/2);
+            temp2 = double((sign(temp2+eps)+1)/2);  %'bitand' won't take 'single' precision
+            temp = (sign(bitand(temp+1,temp2+1)) - .5) * 2;  %-1s and +1s
+            temp = single(temp*Pstruct.contrast2/100);
+    end
+    
+    amp = sin(tdom);
+    switch Pstruct.t_profile2
+        
+        case 'square'
+            thresh = cos(Pstruct.t_duty2*pi);
+            amp = sign(amp-thresh);
+            
+        case 'pulse'
+            thresh = cos(Pstruct.t_duty2*pi);
+            amp = (sign(amp-thresh) + 1)/2;
+    end
+    
+end
+
+

@@ -1,0 +1,14 @@
+function PStruct = getParamStruct
+
+global Pstate Mstate
+
+for i = 1:length(Pstate.param)
+    if strcmpPstate.param{i}{2}
+        
+        eval(['PStruct.' Pstate.param{i}{1} '=' num2str(Pstate.param{i}{3}) ''])
+end
+
+PStruct.screenDist = str2num(Mstate.screenDist);
+PStruct.refresh_rate = Mstate.refresh_rate;
+PStruct.pixpercm = Mstate.pixpercm;
+

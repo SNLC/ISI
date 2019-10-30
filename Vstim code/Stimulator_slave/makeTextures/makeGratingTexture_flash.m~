@@ -1,0 +1,267 @@
+function makeGratingTexture_flash
+
+%make one cycle of the grating
+
+global Mstate screenPTR screenNum
+
+global Gtxtr TDim probRatios %'playgrating' will use these
+
+Screen('Close')  %First clean up: Get rid of all textures/offscreen windows
+
+Gtxtr = []; TDim = [];  %reset
+
+white = WhiteIndex(screenPTR); % pixel value for white
+black = BlackIndex(screenPTR); % pixel value for black
+gray = (white+black)/2;
+amp = white-gray;
+
+Pstruct = getParamStruct;
+screenRes = Screen('Resolution',screenNum);
+
+pixpercmX = screenRes.width/Mstate.screenXcm;
+pixpercmY = screenRes.height/Mstate.screenYcm;
+
+% xcm = 2*Mstate.screenDist*tan(Pstruct.x_size/2*pi/180);  %grating width in cm
+% xN = round(xcm*pixpercmX);  %grating width in pixels
+% ycm = 2*Mstate.screenDist*tan(Pstruct.y_size/2*pi/180);  %grating height in cm
+% yN = round(ycm*pixpercmY);  %grating height in pixels
+
+%The following assumes the screen is curved.  It will give 
+%a slightly wrong stimulus size when they are large.
+xcm = 2*pi*Mstate.screenDist*Pstruct.x_size/360;  %stimulus width in cm
+xN = round(xcm*pixpercmX);  %stimulus width in pixels
+ycm = 2*pi*Mstate.screenDist*Pstruct.y_size/360;   %stimulus height in cm
+yN = round(ycm*pixpercmY);  %stimulus height in pixels
+
+xN = round(xN/Pstruct.x_zoom);  %Downsample for the zoom
+yN = round(yN/Pstruct.y_zoom);
+
+pixpercmX = pixpercmX/Pstruct.x_zoom;
+pixpercmY = pixpercmY/Pstruct.y_zoom;
+
+%create the mask
+xdom = linspace(-Pstruct.x_size/2,Pstruct.x_size/2,xN);
+ydom = linspace(-Pstruct.y_size/2,Pstruct.y_size/2,yN);
+[xdom ydom] = meshgrid(xdom,ydom);
+r = sqrt(xdom.^2 + ydom.^2);
+if strcmp(Pstruct.mask_type,'disc')
+    mask = zeros(size(r));
+    id = find(r<=Pstruct.mask_radius);
+    mask(id) = 1;
+elseif strcmp(Pstruct.mask_type,'gauss')
+    mask = exp((-r.^2)/(2*Pstruct.mask_radius^2));
+else
+    mask = [];
+end
+%%%%%%%%%
+
+
+if ~Pstruct.FourierBit
+    
+    %Make spatial phase domain
+    phasedom = linspace(0,360,Pstruct.n_phase+1);
+    phasedom = phasedom(1:end-1);
+    %Make orientation domain
+    oridom = linspace(Pstruct.ori,Pstruct.ori+180,Pstruct.n_ori+1);
+    oridom = oridom(1:end-1);
+    %Make spatial frequency domain
+    if Pstruct.n_sfreq>1
+        sfdom = logspace(log10(Pstruct.s_freq),log10(Pstruct.s_freq + Pstruct.sfreq_range),Pstruct.n_sfreq);
+    else
+        sfdom = Pstruct.s_freq;
+    end
+    
+    colordom = getColorDomain(Pstruct.colorspace);
+    probRatios = ones(length(oridom),length(sfdom),length(phasedom),length(colordom));
+    
+    k = 1;
+    for oriid = 1:length(oridom)
+        for sfid = 1:length(sfdom)
+            for phaseid = 1:length(phasedom)
+                phase = phasedom(phaseid);
+                ori = oridom(oriid);
+                sf = sfdom(sfid);
+                
+                xcycles = sf * Pstruct.x_size;
+                thetax = linspace(0,2*pi*xcycles,xN+1);
+                thetax = thetax(1:end-1);
+                %thetax(Bads_x) = [];
+                
+                ycycles = sf * Pstruct.y_size;
+                thetay = linspace(0,2*pi*ycycles,yN+1);
+                thetay = thetay(1:end-1);
+                %thetay(Bads_y) = [];
+                
+                [thetax thetay] = meshgrid(thetax,thetay);
+                
+                sdom = thetax*cos(ori*pi/180) - thetay*sin(ori*pi/180);
+                Im = cos(sdom - phase*pi/180);
+                
+                switch Pstruct.s_profile
+                    
+                    case 'sin'
+                        Im = Im*Pstruct.contrast/100;
+                        
+                    case 'square'
+                        thresh = cos(Pstruct.s_duty*pi);
+                        Im = sign(Im-thresh);
+                        Im = Im*Pstruct.contrast/100;
+                        
+                    case 'pulse'
+                        thresh = cos(Pstruct.s_duty*pi);
+                        Im = (sign(Im-thresh) + 1)/2;
+                        Im = Im*Pstruct.contrast/100;
+                        
+                end
+                                
+                if colordom == 1
+                    
+                    Gtxtr(oriid,sfid,phaseid) = Screen(screenPTR, 'MakeTexture', gray+amp*Im);
+                    
+                else
+                    for colorID = 1:length(colordom)
+                        
+                        %%%%%%%%%%%%%%%%%%%%%%%
+                        %This is a total hack%%                        
+                        if strcmp(Pstruct.colorspace,'DKL')
+                            switch colordom(colorID)                                
+                                case 4 %S
+                                    Im2 = Im*.15/.82;                                    
+                                case 5 %L-M                                    
+                                    Im2 = Im;                                    
+                                case 6 %L+M                                    
+                                    Im2 = Im*.15/1.0;
+                            end                                    
+                        elseif strcmp(Pstruct.colorspace,'LMS')
+                            switch colordom(colorID)
+                                case 2 %L
+                                    Im2 = Im;                                  
+                                case 3 %M                                    
+                                    Im2 = Im*.2/.23;                                    
+                                case 4 %S                                    
+                                    Im2 = Im*.2/.82;
+                            end
+                        end
+                        %%%%%%%%%%%%%%%%%%%%%%%%%%%
+                        %%%%%%%%%%%%%%%%%%%%%%%%%%%
+                        
+                        Idraw = ImtoRGB(Im2,colordom(colorID),Pstruct,mask);
+                        Gtxtr(oriid,sfid,phaseid,colorID) = Screen(screenPTR, 'MakeTexture', Idraw);
+                    end
+                end
+                
+                
+                k = k+1;
+            end
+        end
+    end
+    
+    domains = struct;
+    domains.oridom = oridom;
+    domains.sfdom = sfdom;
+    domains.phasedom = phasedom;
+    domains.colordom = colordom;
+    %important to know how the domain order within 'Gtxtr' for reconstructin the sequence...    
+    domains.higherarchy = {'ori','s_freq','phase','color'}; 
+    
+else  %Fourier Basis
+    
+    xN = xN - rem(xN,2);
+    yN = yN - rem(yN,2);    
+
+    colordom = getColorDomain(Pstruct.colorspace);
+    
+    cmperdeg = (2*pi*Mstate.screenDist)/360;
+    Fs_x = pixpercmX*cmperdeg;    %sample rate: pixels per degree
+    Fs_y = pixpercmY*cmperdeg;
+    nx = 0:xN-1;
+    ny = 0:yN-1;
+    kx = -xN/2:xN/2-1;  
+    ky = -yN/2:yN/2-1;
+
+    sfxdom = (kx/xN)*Fs_x;  %convert to cycles/deg to define subspace
+    sfydom = (ky/yN)*Fs_y;
+    idx = find(abs(sfxdom) <= Pstruct.max_sf);
+    idy = find(sfydom <= Pstruct.max_sf & sfydom >= 0); %take half because of symmetry
+    kxdom = kx(idx); %spatial frequency subspace (cycles per image)
+    kydom = ky(idy);
+    
+    probRatios = ones(length(kydom),length(kxdom),4,length(colordom));
+    for kxID = 1:length(kxdom)  %sfreq domain (x)
+        kx_o = kxdom(kxID);
+        for kyID = 1:length(kydom)  %sfreq domain (y)
+            ky_o = kydom(kyID);
+            
+            Im = exp(1i*2*pi*ky_o*ny/yN)'*exp(1i*2*pi*kx_o*nx/xN);
+            
+            %make each phase
+            I{1} = real(Im);
+            I{3} = -I{1};
+            I{2} = imag(Im);
+            I{4} = -I{2};          
+                
+            for ph = 1:length(I)  %phase domain
+                
+                for colorID = 1:length(colordom)  %color domain
+                    
+                    %%%%%%%%%%%%%%%%%%%%%%%
+                    %This is a total hack%%
+                    
+                    if strcmp(Pstruct.colorspace,'DKL')
+                        switch colordom(colorID)
+                            case 4 %S         
+                                Im2 = I{ph}*.15/.82;
+                            case 5 %L-M
+                                Im2 = I{ph};
+                            case 6 %L+M
+                                Im2 = I{ph}*.15/1.0;
+
+                        end
+                    elseif strcmp(Pstruct.colorspace,'LMS')
+                        switch colordom(colorID)
+                            case 2 %L
+                                Im2 = I{ph};
+                            case 3 %M
+                                Im2 = I{ph}*.2/.23;
+                            case 4 %S
+                                Im2 = I{ph}*.2/.82;
+                        end
+                    elseif strcmp(Pstruct.colorspace,'gray')                        
+                        Im2 = I{ph};
+                    end
+                    %%%%%%%%%%%%%%%%%%%%%%%%
+                    %%%%%%%%%%%%%%%%%%%%%%%%
+                    
+                    Idraw = ImtoRGB(Im2,colordom(colorID),Pstruct,mask);
+                    Gtxtr(kyID,kxID,ph,colorID) = Screen(screenPTR, 'MakeTexture', Idraw);  
+                    
+                    %So there isn't a bias for vertical...
+                    if ky_o == 0 && kx_o > 0
+                        probRatios(kyID,kxID,ph,colorID) = 0;
+                    elseif sqrt(kx_o^2 + ky_o^2) > max(kxdom); %Get 
+                        probRatios(kyID,kxID,ph,colorID) = 0;
+                    end        
+                    
+                end
+                
+            end
+            
+        end
+    end
+    
+    domains = struct;
+    domains.kxdom = kxdom;
+    domains.kydom = kydom;
+    domains.phasedom = angle([1 1i -1 -1i])*180/pi;
+    domains.colordom = colordom;
+    %important to know how the domain order within 'Gtxtr' for reconstructin the sequence...    
+    domains.higherarchy = {'kx','ky','phase','color'};
+
+end
+
+if Mstate.running %if its in the looper
+    saveLog(domains)
+end
+    
+TDim = [yN xN];
+TDim(3) = length(Gtxtr(:));

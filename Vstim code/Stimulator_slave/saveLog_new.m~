@@ -1,0 +1,41 @@
+function saveLog_new(domains,seed)
+
+
+global Mstate randLog
+
+root = '/Matlab_code/log_files/';
+
+rootnet = ['/Volumes/neurostuff/log_files/' Mstate.anim '/'];
+
+expt = [Mstate.anim '_' Mstate.unit '_' Mstate.expt];
+
+fname = [root expt '.mat'];
+fnamenet = [rootnet expt '.mat'];
+
+
+
+global loopTrial
+
+baseName = ['randlog_T' num2str(loopTrial)];
+
+eval([basename '.rseed{loopTrial} = x;'])
+eval([basename '.domains{loopTrial} = domains;'])
+
+
+save(fname,['randlog_T' num2str(loopTrial)],'-append')
+save(fnamenet,['randlog_T' num2str(loopTrial)],'-append')
+
+
+if isempty(varargin)  %from 'make'  (happens on first trial only)... save domains and frame rate
+
+    eval(['domains' num2str(loopTrial) '= x']);     
+    eval(['save ' fname 'domains' num2str(loopTrial) ' -append'])
+    eval(['save ' fnamenet 'domains' num2str(loopTrial) ' -append'])
+    
+else %from 'play'... save sequence as 'rseedn'
+    
+    eval(['rseed' num2str(varargin{1}) '=x;' ])
+    eval(['save ' fname ' rseed' num2str(varargin{1}) ' -append'])    
+    eval(['save ' fnamenet ' rseed' num2str(varargin{1}) ' -append'])   
+    
+end

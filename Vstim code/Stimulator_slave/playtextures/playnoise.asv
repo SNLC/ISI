@@ -1,0 +1,83 @@
+function playnoise
+
+global Mstate screenPTR screenNum 
+
+global Gtxtr TDim  %Created in makeGratingTexture
+
+global Stxtr %Created in makeSyncTexture
+
+Pstruct = getParamStruct;
+
+screenRes = Screen('Resolution',screenNum);
+pixpercmX = screenRes.width/Mstate.screenXcm;
+pixpercmY = screenRes.height/Mstate.screenYcm;
+
+syncWX = round(pixpercmX*3.5);
+syncWY = round(pixpercmY*3.5);
+
+% xcm = 2*Mstate.screenDist*tan(Pstruct.x_size/2*pi/180);  %stimulus width in cm
+% xN = round(xcm*pixpercmX);  %stimulus width in pixels
+% ycm = 2*Mstate.screenDist*tan(Pstruct.y_size/2*pi/180);  %stimulus height in cm
+% yN = round(ycm*pixpercmY);  %stimulus height in pixels
+
+%The following assumes the screen is curved
+xcm = 2*pi*Mstate.screenDist*Pstruct.x_size/360;  %stimulus width in cm
+xN = round(xcm*pixpercmX);  %stimulus width in pixels
+ycm = 2*pi*Mstate.screenDist*Pstruct.y_size/360;   %stimulus height in cm
+yN = round(ycm*pixpercmY);  %stimulus height in pixels
+
+xran = [Pstruct.x_pos-floor(xN/2)+1  Pstruct.x_pos+ceil(xN/2)];
+xran(1) = max([xran(1) 0]); xran(2) = min([xran(2) screenRes.width-1]);
+yran = [Pstruct.y_pos-floor(yN/2)+1  Pstruct.y_pos+ceil(yN/2)];
+yran(1) = max([yran(1) 0]); yran(2) = min([yran(2) screenRes.height-1]);
+
+%%%%%%%%%%%%%%%%%%
+
+
+Npreframes = ceil(Pstruct.predelay*screenRes.hz);
+Npostframes = ceil(Pstruct.postdelay*screenRes.hz);
+N_Im = round(Pstruct.stim_time*screenRes.hz);
+
+%%%%%%%%%%%%%%%
+
+SyncLoc = [0 screenRes.height-syncWY syncWX-1 screenRes.height-1]';
+SyncPiece = [0 0 syncWX-1 syncWY-1]';
+
+TextPiece = [0 0 TDim(2)-1 TDim(1)-1]';
+%%%%%%%%%%%%%%%
+
+Screen(screenPTR, 'FillRect', Pstruct.background)
+
+%%%Play predelay %%%%
+Screen('DrawTexture', screenPTR, Stxtr(1),[0 0 syncWX-1 syncWY-1],SyncLoc);
+Screen(screenPTR, 'Flip');
+for i = 2:Npreframes
+    Screen('DrawTexture', screenPTR, Stxtr(2),[0 0 syncWX-1 syncWY-1],SyncLoc);
+    Screen(screenPTR, 'Flip');
+end
+
+%%%%%Play whats in the buffer (the stimulus)%%%%%%%%%%
+Screen('DrawTextures', screenPTR, [Gtxtr(1) Stxtr(1)],[[0 0 TDim(2)-1 TDim(1)-1]' [0 0 syncWX-1 syncWY-1]'],[[xran(1) yran(1) xran(2) yran(2)]' SyncLoc]);
+Screen(screenPTR, 'Flip');
+for i = 2:N_Im-1
+    Screen('DrawTextures', screenPTR, [Gtxtr(i) Stxtr(2)],[[0 0 TDim(2)-1 TDim(1)-1]' [0 0 syncWX-1 syncWY-1]'],[[xran(1) yran(1) xran(2) yran(2)]' SyncLoc]);
+    Screen(screenPTR, 'Flip');
+end
+Screen('DrawTextures', screenPTR, [Gtxtr(N_Im) Stxtr(1)],[[0 0 TDim(2)-1 TDim(1)-1]' [0 0 syncWX-1 syncWY-1]'],[[xran(1) yran(1) xran(2) yran(2)]' [0 screenRes.height-syncWY syncWX-1 screenRes.height-1]']);
+Screen(screenPTR, 'Flip');
+
+%%%Play postdelay %%%%
+for i = 1:Npostframes-1
+    Screen('DrawTexture', screenPTR, Stxtr(2),[0 0 syncWX-1 syncWY-1],[0 screenRes.height-syncWY syncWX-1 screenRes.height-1]);
+    Screen(screenPTR, 'Flip');
+end
+Screen('DrawTexture', screenPTR, Stxtr(1),[0 0 syncWX-1 syncWY-1],[0 screenRes.height-syncWY syncWX-1 screenRes.height-1]);
+Screen(screenPTR, 'Flip');
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Screen('DrawTexture', screenPTR, Stxtr(2),[0 0 syncWX-1 syncWY-1],[0 screenRes.height-syncWY syncWX-1 screenRes.height-1]);  
+Screen(screenPTR, 'Flip');
+
+Screen('Close')  %Get rid of all textures/offscreen windows
+

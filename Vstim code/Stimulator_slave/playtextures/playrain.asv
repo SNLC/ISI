@@ -1,0 +1,161 @@
+function playrain
+
+global Mstate screenPTR screenNum 
+
+global Gtxtr TDim  %Created in makeGratingTexture
+
+global Stxtr %Created in makeSyncTexture
+
+Pstruct = getParamStruct;
+
+screenRes = Screen('Resolution',screenNum);
+pixpercmX = screenRes.width/Mstate.screenXcm;
+pixpercmY = screenRes.height/Mstate.screenYcm;
+
+syncWX = round(pixpercmX*3.5);
+syncWY = round(pixpercmY*3.5);
+
+% xcm = 2*Mstate.screenDist*tan(Pstruct.x_size/2*pi/180);  %stimulus width in cm
+% xN = round(xcm*pixpercmX);  %stimulus width in pixels
+% ycm = 2*Mstate.screenDist*tan(Pstruct.y_size/2*pi/180);  %stimulus height in cm
+% yN = round(ycm*pixpercmY);  %stimulus height in pixels
+
+%The following assumes the screen is curved
+xcm = 2*pi*Mstate.screenDist*Pstruct.x_size/360;  %stimulus width in cm
+xN = round(xcm*pixpercmX);  %stimulus width in pixels
+ycm = 2*pi*Mstate.screenDist*Pstruct.y_size/360;   %stimulus height in cm
+yN = round(ycm*pixpercmY);  %stimulus height in pixels
+
+%These define the perimeters of the "location grid"
+xran = [Pstruct.x_pos-floor(xN/2)+1  Pstruct.x_pos+ceil(xN/2)];
+%xran(1) = max([xran(1) 0]); xran(2) = min([xran(2) screenRes.width-1]);
+yran = [Pstruct.y_pos-floor(yN/2)+1  Pstruct.y_pos+ceil(yN/2)];
+%yran(1) = max([yran(1) 0]); yran(2) = min([yran(2) screenRes.height-1]);
+
+%%%Make domains%%%
+xdom = linspace(xran(1),xran(2),Pstruct.Nx); %Make x domain  (these are the center locations of the bar)
+ydom = linspace(yran(1),yran(2),Pstruct.Ny); %Make y domain
+%Make orientation domain
+oridom = linspace(Pstruct.ori,Pstruct.ori+360,Pstruct.n_ori+1);  %It goes to 360 because it is actually 'direction'
+oridom = oridom(1:end-1);
+%Make bw domain
+if Pstruct.bw_bit == 0 || Pstruct.bw_bit == 1
+    bwdom = 1;
+else
+    bwdom = [1 2];
+end
+%%%%%%%%%%%%%%%%%%
+
+
+Npreframes = ceil(Pstruct.predelay*screenRes.hz);
+Npostframes = ceil(Pstruct.postdelay*screenRes.hz);
+N_Im = round(Pstruct.stim_time*screenRes.hz/Pstruct.h_per); %number of images to present
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Create independent sequence for each parameter
+
+TextLoc = cell(N_Im,Pstruct.h_per);
+TextPiece = cell(1,N_Im);
+GtxtrAll = cell(1,N_Im);
+for k = 1:Pstruct.Ndrops
+    
+    RandStream.setDefaultStream(RandStream('mt19937ar','seed',Pstruct.rseed+k)); %initialize the seed
+    xseq = round(rand(1,N_Im)*length(xdom)+.5);
+    xseq = xdom(xseq);
+    
+    RandStream.setDefaultStream(RandStream('mt19937ar','seed',Pstruct.rseed+10+k));
+    yseq = round(rand(1,N_Im)*length(ydom)+.5);
+    yseq = ydom(yseq);
+    
+    RandStream.setDefaultStream(RandStream('mt19937ar','seed',Pstruct.rseed+20+k));
+    oriseq = round(rand(1,N_Im)*length(oridom)+.5);
+    
+    RandStream.setDefaultStream(RandStream('mt19937ar','seed',Pstruct.rseed+30+k));
+    bwseq = round(rand(1,N_Im)*length(bwdom)+.5); %this should remain an index value
+    
+    %Define the borders of the bar within the screen
+    
+%     for i = 1:length(oriseq)
+%         textW(i) = TDim{oriseq(i)}(2);
+%         textL(i) = TDim{oriseq(i)}(1);
+%     end
+    
+    xseqL = xseq-(ceil(TDim(2)/2)-1);
+    xseqR = xseq+floor(TDim(2)/2);
+    yseqL = yseq-(ceil(TDim(1)/2)-1);
+    yseqR = yseq+floor(TDim(1)/2);
+    
+    Dinc = 2*Mstate.screenDist*tan(Pstruct.speed/2*pi/180);  %cm increment per frame
+    
+    for i = 1:N_Im
+        xinc = Dinc*cos(oridom(oriseq(i))*pi/180);
+        yinc = -Dinc*sin(oridom(oriseq(i))*pi/180);  %negative because origin is at top
+        for j = 1:Pstruct.h_per
+            dx = (j-1)*xinc;
+            dx = round(dx*pixpercmX);  %convert to pixels
+            dy = (j-1)*yinc;
+            dy = round(dy*pixpercmY);  %convert to pixels
+            xseqL2 = xseqL(i)+dx;
+            xseqR2 = xseqR(i)+dx;
+            yseqL2 = yseqL(i)+dy;
+            yseqR2 = yseqR(i)+dy;
+            
+            TextLoc{i,j} = [TextLoc{i,j} [xseqL2 yseqL2 xseqR2 yseqR2]'];
+        end
+        
+        %TextPiece{i} = [TextPiece{i} [0 0 TDim{oriseq(i)}(2)-1 TDim{oriseq(i)}(1)-1]'];
+        
+        GtxtrAll{i} = [GtxtrAll{i} Gtxtr(bwseq(i))];
+    end
+    
+    
+end
+
+SyncLoc = [0 screenRes.height-syncWY syncWX-1 screenRes.height-1]';
+SyncPiece = [0 0 syncWX-1 syncWY-1]';
+
+TextPiece = [0 0 TDim(2)-1 TDim(1)-1]';
+TextPiece = TextPiece*ones(1,Pstruct.Ndrops);
+
+%%%%
+
+%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%
+
+Screen(screenPTR, 'FillRect', Pstruct.background)
+
+%%%Play predelay %%%%
+Screen('DrawTexture', screenPTR, Stxtr(1),SyncPiece,SyncLoc);
+Screen(screenPTR, 'Flip');
+for i = 2:Npreframes
+    Screen('DrawTexture', screenPTR, Stxtr(2),SyncPiece,SyncLoc);
+    Screen(screenPTR, 'Flip');
+end
+
+%%%%%Play whats in the buffer (the stimulus)%%%%%%%%%%
+
+for i = 1:N_Im
+    for j = 1:Pstruct.h_per                  %sync flips on each update    
+        
+        Screen('DrawTextures', screenPTR, [GtxtrAll{i} Stxtr(2-rem(i,2))],...
+            [TextPiece SyncPiece],[TextLoc{i,j} SyncLoc],[ 0]);
+          
+        Screen(screenPTR, 'Flip');
+    end
+end
+
+%%%Play postdelay %%%%
+for i = 1:Npostframes-1
+    Screen('DrawTexture', screenPTR, Stxtr(2),SyncPiece,SyncLoc);
+    Screen(screenPTR, 'Flip');
+end
+Screen('DrawTexture', screenPTR, Stxtr(1),SyncPiece,SyncLoc);
+Screen(screenPTR, 'Flip');
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Screen('DrawTexture', screenPTR, Stxtr(2),[0 0 syncWX-1 syncWY-1],SyncLoc);  
+Screen(screenPTR, 'Flip');
+
+Screen('Close')  %Get rid of all textures/offscreen windows
+

@@ -1,0 +1,96 @@
+function makeGratingTexture_flash
+
+%make one cycle of the grating
+
+global Mstate screenPTR screenNum 
+
+global Gtxtr TDim  %'playgrating' will use these
+
+Gtxtr = 0
+
+white = WhiteIndex(screenPTR); % pixel value for white
+black = BlackIndex(screenPTR); % pixel value for black
+gray = (white+black)/2;
+amp = white-gray;
+
+Pstruct = getParamStruct;
+screenRes = Screen('Resolution',screenNum);
+
+pixpercmX = screenRes.width/Mstate.screenXcm;
+pixpercmY = screenRes.height/Mstate.screenYcm;
+
+xN = 2*Mstate.screenDist*tan(Pstruct.x_size/2*pi/180);  %grating width in cm
+xN = round(xN*pixpercmX);  %grating width in pixels
+yN = 2*Mstate.screenDist*tan(Pstruct.y_size/2*pi/180);  %grating height in cm
+yN = round(yN*pixpercmY);  %grating height in pixels
+
+xran = Pstruct.x_pos-floor(xN/2)+1 : Pstruct.x_pos+ceil(xN/2);
+Bads_x = find(xran < 0  |  xran > screenRes.width-1);
+yran = Pstruct.y_pos-floor(yN/2)+1 : Pstruct.y_pos+ceil(yN/2);
+Bads_y = find(yran < 0  |  yran > screenRes.height-1);
+
+xcycles = Pstruct.s_freq * Pstruct.x_size;
+ycycles = Pstruct.s_freq * Pstruct.y_size;
+
+%Make spatial phase domain
+phasedom = linspace(0,360,Pstruct.n_phase+1);
+phasedom = phasedom(1:end-1);
+%Make orientation domain
+oridom = linspace(Pstruct.ori,Pstruct.ori+180,Pstruct.n_ori+1);
+oridom = oridom(1:end-1);
+%Make spatial frequency domain
+sfdom = logspace(log10(Pstruct.s_freq),log10(Pstruct.s_freq + Pstruct.sfreq_range),Pstruct.n_sfreq);
+
+k = 1;
+for oriid = 1:length(oridom)
+    for sfid = 1:length(sfdom)
+        for phaseid = 1:length(phasedom)
+            phase = phasedom(phaseid);
+            ori = oridom(oriid);
+            sf = sfdom(sfid);
+            
+            xcycles = sf * Pstruct.x_size;
+            
+            thetax = linspace(0,2*pi*xcycles,xN+1);
+            thetax = thetax(1:end-1);
+            thetax(Bads_x) = [];
+            
+            ycycles = sf * Pstruct.y_size;
+            thetay = linspace(0,2*pi*ycycles,yN+1);
+            thetay = thetay(1:end-1);
+            thetay(Bads_y) = [];
+            
+            [thetax thetay] = meshgrid(thetax,thetay);
+            
+            sdom = thetax*cos(ori*pi/180) - thetay*sin(ori*pi/180);
+            Im = cos(sdom - phase*pi/180);
+            
+            switch Pstruct.st_profile
+                
+                case 'sin'
+                    Im = Im*Pstruct.contrast/100;
+                    
+                case 'square'
+                    thresh = cos(Pstruct.s_duty*pi);
+                    Im = sign(Im-thresh);
+                    Im = Im*Pstruct.contrast/100;
+                    
+                case 'pulse'
+                    thresh = cos(Pstruct.s_duty*pi);
+                    Im = (sign(Im-thresh) + 1)/2;
+                    Im = Im*Pstruct.contrast/100;
+                    
+            end
+            
+            
+            Gtxtr(oriid,sfid,phaseid) = Screen(screenPTR, 'MakeTexture', gray+amp*Im);
+            
+            k = k+1;
+        end
+    end
+end
+
+TDim = size(Im);
+TDim(3) = length(Gtxtr(:));
+
+    

@@ -1,0 +1,23 @@
+function makeSyncTexture
+
+%make one cycle of the grating
+
+global Mstate screenPTR screenNum 
+
+global Stxtr %'playgrating' will use these
+
+white = WhiteIndex(screenPTR); % pixel value for white
+black = BlackIndex(screenPTR); % pixel value for black
+gray = (white+black)/2;
+amp = white-gray;
+
+screenRes = Screen('Resolution',screenNum);
+
+pixpercmX = screenRes.width/Mstate.screenXcm;
+pixpercmY = screenRes.height/Mstate.screenYcm;
+
+syncWX = round(pixpercmX*3.5);
+syncWY = round(pixpercmY*3.5);
+Stxtr(1) = Screen(screenPTR, 'MakeTexture', white*ones(syncWY,syncWX)); % "hi"
+Stxtr(2) = Screen(screenPTR, 'MakeTexture', black*ones(syncWY,syncWX)); % "low"
+

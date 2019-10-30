@@ -1,0 +1,11 @@
+function updateMstate(pname,pval)
+
+global Mstate
+
+if strcmp(pname,'screenDist')
+    eval(['Mstate.' pname ' = pval;']);
+else
+    eval(['Mstate.' pname ' = str2num(pval);']);
+end
+
+Mstate

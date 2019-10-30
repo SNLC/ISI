@@ -1,0 +1,29 @@
+function barout = makeBar(Wx,Wy,ori,screenRes)
+
+%Wx,Wy are the size of the bar in cm (hasn't yet corrected for different x,y resolutions)
+
+global Mstate
+
+pixpercmX = screenRes.width/Mstate.screenXcm;
+pixpercmY = screenRes.height/Mstate.screenYcm;
+
+domy = linspace(0,2*max([Wx Wy]),round(pixpercmY*2*max([Wx Wy])));
+domx = linspace(0,2*max([Wx Wy]),round(pixpercmX*2*max([Wx Wy])));
+domx = domx-median(domx);
+domy = domy-median(domy);
+
+[domx domy] = meshgrid(domx,domy);
+
+xp = domx*cos(ori*pi/180) + domy*sin(ori*pi/180);
+yp = domy*cos(ori*pi/180) - domx*sin(ori*pi/180);
+
+idx = find(xp <= Wx/2 & xp >= -Wx/2  &  yp <= Wy/2 & yp >= -Wy/2);
+temp = zeros(size(domx));
+temp(idx) = 1;
+
+idxmin = min(domx(idx)); idxmin = idxmin(1);
+idxmax = max(domx(idx)); idxmax = idxmax(1);
+idymin = min(domy(idx)); idymin = idymin(1);
+idymax = max(domy(idx)); idymax = idymax(1);
+
+barout = temp(idymin:idymax,idxmin:idxmax);

@@ -1,0 +1,115 @@
+function [sdom, tdom, x_ecc, y_ecc] = makeGraterDomain(xN,yN,ori,s_freq,t_period,altazimuth)
+
+global Mstate
+
+P = getParamStruct;
+
+switch altazimuth
+
+    case 'none'  %For this case we assume that the screen is curved
+        
+        x_ecc = P.x_size/2;
+        y_ecc = P.y_size/2;
+        
+        x_ecc = single(linspace(-x_ecc,x_ecc,xN));  %deg
+        y_ecc = single(linspace(-y_ecc,y_ecc,yN));
+        
+        [x_ecc y_ecc] = meshgrid(x_ecc,y_ecc);  %deg
+
+        
+    case 'altitude'
+        
+        %%%Get the xy domain
+        x_ecc = single(tan(P.x_size/2*pi/180)*Mstate.screenDist);  %cm
+        y_ecc = single(tan(P.y_size/2*pi/180)*Mstate.screenDist);
+        
+        x_ecc = single(linspace(-x_ecc,x_ecc,xN)); %cm
+        y_ecc = single(linspace(-y_ecc,y_ecc,yN));
+        
+        [x_ecc y_ecc] = meshgrid(x_ecc,y_ecc);
+        
+    case  'azimuth'
+        
+        %%%Get the xy domain
+        x_ecc = single(tan(P.x_size/2*pi/180)*Mstate.screenDist);  %cm
+        y_ecc = single(tan(P.y_size/2*pi/180)*Mstate.screenDist);
+        
+        x_ecc = single(linspace(-x_ecc,x_ecc,xN)); %cm
+        y_ecc = single(linspace(-y_ecc,y_ecc,yN));
+        
+        [x_ecc y_ecc] = meshgrid(x_ecc,y_ecc);
+             
+end
+
+
+%Rotate, distort (get degrees as a function of xy location), convert to cycles.
+    
+P.tilt = 0;
+P.rot = 0;
+
+switch altazimuth
+    
+    case 'none'
+        
+        sdom = x_ecc*cos(ori*pi/180) - y_ecc*sin(ori*pi/180);    %deg
+        
+    case 'altitude'
+        
+        %Apply "tilt" to x and z dimensions    
+        z_ecc = Mstate.screenDist*ones(size(x_ecc));  %dimension perpendicular to screen
+        x_eccT = x_ecc*cos(P.tilt*pi/180) - z_ecc*sin(P.tilt*pi/180);
+        z_eccT = x_ecc*sin(P.tilt*pi/180) + z_ecc*cos(P.tilt*pi/180);        
+        %ydimension does not change with tilt
+        
+        %Apply "rotation" around the x and y dimensions    
+        x_eccT = x_ecc*cos(P.tilt*pi/180) - z_ecc*sin(P.tilt*pi/180);
+        z_eccT = x_ecc*sin(P.tilt*pi/180) + z_ecc*cos(P.tilt*pi/180);        
+        %ydimension does not change with tilt
+        
+        %Apply "orientation"
+        sdomx = x_eccT*cos(ori*pi/180 + pi/2) - y_ecc*sin(ori*pi/180 + pi/2);    %cm
+        sdomy = x_eccT*sin(ori*pi/180 + pi/2) + y_ecc*cos(ori*pi/180 + pi/2);    %cm
+        
+        %sdom = atan(sdomy.*cos(atan(sdomx./z_eccT))./z_eccT)*180/pi; %deg
+        
+        sdom = asin(sdomy./sqrt(sdomx.^2 + sdomy.^2 + z_eccT.^2))*180/pi;
+
+    case 'azimuth' %The projection of azimuth onto a plane is the same as a cylinder on a plane
+        
+        %Apply "tilt" to y and z dimensions    
+        z_ecc = Mstate.screenDist*ones(size(x_ecc));  %dimension perpendicular to screen
+        y_eccT = y_ecc*cos(-P.tilt*pi/180) - z_ecc*sin(-P.tilt*pi/180);
+        z_eccT = y_ecc*sin(-P.tilt*pi/180) + z_ecc*cos(-P.tilt*pi/180);        
+        
+        %Apply "rotation" to x and z dimensions    
+        x_eccR = x_ecc*cos(P.rot*pi/180) - z_eccT*sin(P.rot*pi/180);
+        z_eccR = x_ecc*sin(P.rot*pi/180) + z_eccT*cos(P.rot*pi/180);                
+        
+        %Apply orientation around the "tilt/rotation axis" using Rodriques'
+        %rotation formula
+        r = Mstate.screenDist;
+        u = [r*sin(P.tilt*pi/180)*sin(P.rot*pi/180) r*cos(P.tilt*pi/180) r*sin(P.tilt*pi/180)*cos(P.rot*pi/180)];
+        u = u/norm(u);
+        P = u'*u;
+        Q = [0 -u(3) u(2); u(3) 0 -u(1); -u(2) u(1) 0];
+        R = P + (eye(3)-P)*cos(ori*pi/180) + Q*sin(ori*pi/180); %matrix to orient about tilt/rotation axis
+        R
+        x = y_eccR*R(1,1) + y_eccT*R(1,2) + y_eccR*R(1,3);    %cm
+        z = _eccR*R(3,1) + y_eccT*R(3,2) + y_eccR*R(3,3);    %cm
+
+        %x = x_ecc*cos(ori*pi/180) - y_ecc*sin(ori*pi/180);    %cm
+        %y = x_ecc*sin(ori*pi/180) + y_ecc*cos(ori*pi/180);     %cm
+        
+     
+
+        
+        sdom = atan(x./z)*180/pi; %deg
+        
+end
+
+sdom = sdom*s_freq*2*pi + pi; %radians
+tdom = single(linspace(0,2*pi,t_period+1));
+tdom = tdom(1:end-1);
+    
+
+    

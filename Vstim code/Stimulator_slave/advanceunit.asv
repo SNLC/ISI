@@ -1,0 +1,11 @@
+function advanceunit
+
+global Mstate Pstate Lstate
+
+Analyzer.M = Mstate;
+Analyzer.P = Pstate;
+Analyzer.L = Lstate;
+
+title = [Mstate.anim '_' sprintf('u%s',Mstate.unit) '_' Mstate.expt];
+location = ['C:\PTB\neurodata\' title] ;
+save(location,Analyzer);

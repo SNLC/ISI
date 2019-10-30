@@ -1,0 +1,251 @@
+function ImRGB = ImtoRGB(Im,colormod,P,mask)
+
+%This function takes the image 'Im', which ranges from -1 to 1 and converts
+%it into the RGB image with color direction based on colormod.  The output
+%image can be made as a texture.
+
+%colormod as an input is used for the flash grater, when color is
+%randomized. 
+
+
+switch colormod
+    
+    case 1  %this obeys the input gain values
+        
+        rgain = P.redgain; 
+        ggain = P.greengain;
+        bgain = P.bluegain;
+        
+    case 2  %L-cone isolation
+        
+        %monk aa6
+%         rgain = 1;
+%         bgain = -.162;
+%         ggain = -.00547;
+
+%         %6/20/10 (2 deg fundamentals)
+%         rgain = 1;
+%         ggain = -.1961;
+%         bgain = -.0187;
+
+        %6/20/10 (10 deg fundamentals)
+%         rgain = 1;
+%         ggain = -.1782;
+%         bgain = -.0228;
+        
+        %9/12/10 (10 deg fundamentals)
+%         rgain = 1;
+%         ggain = -.1772;
+%         bgain = -.0143;
+
+        %7/9/11 (10 deg fundamentals)
+        rgain = 1;
+        ggain = -.1774;
+        bgain = -.0076;
+
+        %fake cones
+%         rgain = 1;
+%         ggain = -.1115;
+%         bgain = -.0218;
+                
+    case 3  %M-cone isolation
+        
+        %monk aa6
+%         rgain = -1;
+%         bgain = .470;
+%         ggain = -.037;
+
+%         %6/20/10 (2 deg fundamentals)
+%         rgain = -1;
+%         ggain = .5620;
+%         bgain = -.0357;
+        
+        %6/20/10 (10 deg fundamentals)
+%         rgain = -1;
+%         ggain = .5142;
+%         bgain = -.0229;
+        
+        %9/12/10 (10 deg fundamentals)
+%         rgain = -1;
+%         ggain = .5214;
+%         bgain = -.0273
+
+        %7/9/11 (10 deg fundamentals)
+        rgain = -1;
+        ggain = .5278;
+        bgain = -.0309;
+
+        
+        %fake cones
+%         rgain = -1.0;
+%         ggain = .5948;
+%         bgain = .0002;
+        
+    case 4  %S-cone isolation
+        
+        %monk aa6
+%         rgain = .158;
+%         bgain = -.196;
+%         ggain = 1;
+
+% %       %6/20/10 (2 deg fundamentals)
+%         rgain = .1261;
+%         ggain = -.2071;
+%         bgain = 1;
+
+%       %6/20/10 (10 deg fundamentals)
+%         rgain = .2052;
+%         ggain = -.2768;
+%         bgain = 1;
+        
+        %%9/12/10 (10 deg fundamentals)
+%         rgain = .2050;
+%         ggain = -.2738;
+%         bgain = 1;
+
+        %%7/9/11 (10 deg fundamentals)
+        rgain = .2106;
+        ggain = -.2724;
+        bgain = 1;
+        
+        %fake cones
+%         rgain = .3624;
+%         ggain = -.2742;
+%         bgain = 1.0;
+        
+    case 5  %L-M 
+
+        %monk aa6
+%         rgain = 1;
+%         bgain = -.3578;
+%         ggain = .0257;
+   
+%         %6/20/10 (2 deg fundamentals)
+%         rgain = 1;
+%         ggain = -.3613;
+%         bgain = -.0059;
+
+
+        %6/20/10 (10 deg fundamentals)
+%         rgain = 1;
+%         ggain = -.334;
+%         bgain = -.0016;
+
+%         %9/12/10 (10 deg fundamentals)
+%         rgain = 1;
+%         ggain = -.3365;
+%         bgain = -.0049;
+
+        %7/9/11 (10 deg fundamentals)
+        rgain = 1;
+        ggain = -.3441;
+        bgain = .0054;
+        
+        
+    case 6  %L+M
+
+        %monk aa6
+%         rgain = -1.0;
+%         bgain = .9104;
+%         ggain = -.0984;
+
+%         %6/20/10 (2 deg fundamentals)       
+%         rgain = .6617;
+%         ggain = 1;
+%         bgain = -.1803;
+
+        %6/20/10 (10 deg fundamentals)       
+%         rgain = .5107;
+%         ggain = 1;
+%         bgain = -.1603;
+        
+        
+%         %9/12/10 (10 deg fundamentals)       
+%         rgain = .5122;
+%         ggain = 1;
+%         bgain = -.1390;
+
+        %7/9/11 (10 deg fundamentals)       
+        rgain = .3075;
+        ggain = 1;
+        bgain = -.1390;
+        
+    case 7 %S + (L-M)
+
+        %monk aa6
+%         rgain = 1.0;
+%         bgain = -.3782;
+%         ggain = .1819;
+
+%         %6/20/10 (2 deg fundamentals
+%         rgain = 1.0;
+%         ggain = -.3849;
+%         bgain = .1517;
+
+        %6/20/10 (10 deg fundamentals
+%         rgain = 1.0;
+%         ggain = -.3849;
+%         bgain = .1517;
+        
+        %9/12/10 (10 deg fundamentals
+%         rgain = 1.0;
+%         ggain = -.3629;
+%         bgain = .1338;
+        
+        %7/9/11 (10 deg fundamentals
+        rgain = 1.0;
+        ggain = -.3629;
+        bgain = .1338;
+        
+        
+    case 8 %S - (L-M)
+ 
+        %monk aa6
+%         rgain = -1.0;
+%         bgain = .3369;
+%         ggain = -.1455;
+
+%         %6/20/10 (2 deg fundamentals)
+%         rgain = -1.0;
+%         ggain = .2613;
+%         bgain = .0986;
+
+        %6/20/10 (10 deg fundamentals)
+%         rgain = -1.0;
+%         ggain = .2613;
+%         bgain = .0986;
+        
+%         %9/12/10 (10 deg fundamentals)
+%         rgain = -1.0;
+%         ggain = .3086;
+%         bgain = .1311;
+
+        %7/9/11 (10 deg fundamentals)
+        rgain = -1.0;
+        ggain = .3086;
+        bgain = .1311;
+        
+        
+end
+        
+ImRGB = zeros(length(Im(:,1)),length(Im(1,:)),3,'uint8');  %make ImRGB uint8
+
+ImRdum = Im*rgain;   %[-1 1]
+ImGdum = Im*ggain;
+ImBdum = Im*bgain;
+
+
+if ~isempty(mask) %Made 'if' to significantly reduce computation for large stimuli
+    C = (128 - P.background)/128;  %used so the mask looks right when background ~= 128
+    ImRdum = (ImRdum + C).*mask - C;
+    ImGdum = (ImGdum + C).*mask - C;
+    ImBdum = (ImBdum + C).*mask - C;
+end
+ImRdum = (ImRdum+1)/2 - (.5-P.redbase);  %[0 1]
+ImGdum = (ImGdum+1)/2 - (.5-P.greenbase);  
+ImBdum = (ImBdum+1)/2 - (.5-P.bluebase);  
+
+ImRGB(:,:,1) = round(ImRdum*255);  %[0 255]
+ImRGB(:,:,2) = round(ImGdum*255);
+ImRGB(:,:,3) = round(ImBdum*255);
+

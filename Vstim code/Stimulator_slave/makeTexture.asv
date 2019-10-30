@@ -1,0 +1,29 @@
+function makeTexture(modID)
+
+Pstruct = getParamStruct;
+
+switch modID
+    
+    case 'GT'  %Grater
+        
+        switch Pstruct.type            
+            case 'drift'                
+                makeGratingTexture_drift_beta                
+            case 'flash'                
+                makeGratingTexture_flash                
+        end
+        
+    case 'RD'  %Raindropper
+        
+        makeRainTexture
+        
+    case 'RD'  %Noise
+        
+        makeRainTexture
+        
+    case 'MP'  %Mapper
+        
+        makeMapper        
+        
+end
+

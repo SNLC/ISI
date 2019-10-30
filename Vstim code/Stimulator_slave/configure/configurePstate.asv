@@ -1,0 +1,24 @@
+function configurePstate(modID)
+
+
+switch modID
+    
+    case 'GT'
+        
+        configPstate_Grater
+        
+    case 'RD'
+        
+        configPstate_Rain
+        
+    case 'FN'
+        
+        configPstate_Noise
+        
+    case 'MP'
+        
+        configPstate_Mapper
+        
+        
+end
+

@@ -1,0 +1,30 @@
+function configPstate_Noise
+
+global Pstate
+
+Pstate = struct; %clear it
+
+Pstate.param{1} = {'predelay'  'float'      2       0                'sec'};
+Pstate.param{2} = {'postdelay'  'float'     2       0                'sec'};
+Pstate.param{3} = {'stim_time'  'float'     1       0                'sec'};
+Pstate.param{4} = {'contrast'    'float'     100       0                '%'};
+Pstate.param{5} = {'x_pos'       'int'      600       0                'pixels'};
+Pstate.param{6} = {'y_pos'       'int'      400       0                'pixels'};
+Pstate.param{7} = {'x_size'      'float'      3       1                'deg'};
+Pstate.param{8} = {'y_size'      'float'      3       1                'deg'};
+Pstate.param{9} = {'x_zoom'      'int'   1       0                ''};
+Pstate.param{10} = {'y_zoom'      'int'   1       0                ''};
+
+Pstate.param{11} = {'tlp_cutoff'      'float'   1       0                'cycles/sec'};
+Pstate.param{12} = {'thp_cutoff'      'float'   1       0                'cycles/sec'};
+
+Pstate.param{13} = {'s_decay'      'float'   1       0                'cycles/sec'};
+
+Pstate.param{14} = {'background'      'int'   128       0                ''};
+
+Pstate.param{15} = {'rseed'      'int'   1       0                ''};
+
+Pstate.param{16} = {'tAmp_profile'      'string'   1       0                'cycles/sec'};
+Pstate.param{17} = {'tAmp_period'      'float'   1       0                'cycles/sec'};
+
+
