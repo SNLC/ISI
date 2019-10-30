@@ -1,7 +1,7 @@
 # ISI
 Code for ISI image acquisition, stimulus presentation, and mouse visual area segmentation.
 
-![Alt text](NP-P160101A Fig 4.png?raw=true "Figure 4 from Juavinett, Nauhaus, Garrett & Callaway 2016")
+![Alt text](https://github.com/SNLC/ISI/blob/master/NP-P160101A%20Fig%204.png?raw=true?raw=true "Figure 4 from Juavinett, Nauhaus, Garrett & Callaway 2016")
 
 
 **Imager & Stimulator Programs**
