@@ -1,0 +1,41 @@
+function plotF0(f0dum)
+
+global bcond bw
+
+bwdum = bw;
+id = find(~bw);
+bwdum(id
+
+k = 1;
+for(i=0:length(f0dum)-1)
+    pepsetcondition(i)
+    if(~pepblank)       %This loop filters out the blanks
+        v = pepgetvalues;
+        param(k) = v(1);
+        f0{k} = f0dum{i+1};
+        
+        ma(k) = max(f0{k}(:));
+        mi(k) = min(f0{k}(:));
+        k = k+1;
+    end
+end
+
+domain = sort(param);
+
+ma = max(ma);
+mi = min(mi);
+
+nc = pepgetnoconditions;
+
+figure
+for i = 1:length(f0)
+
+    id = find(param(i) == domain)
+
+    subplot(1,length(f0),id)
+    imagesc(f0{i},[mi ma])
+    title(['value ' num2str(param(i)) '  CH 1'])
+
+end
+
+colormap gray

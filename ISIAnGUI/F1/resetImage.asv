@@ -1,0 +1,23 @@
+function resetImage(trx)
+
+global imstate
+
+switch trx
+    
+    case 'UD'        
+        imstate.imanat = flipud(imstate.imanat);        
+        imstate.imfunc = flipud(imstate.imfunc); 
+    case 'LR'        
+        imstate.imanat = fliplr(imstate.imanat);        
+        imstate.imfunc = fliplr(imstate.imfunc); 
+    case 'rotate'        
+        imstate.imanat = flipud(imstate.imanat');  %Rotate 90deg cc
+        imstate.imfunc = flipud(imstate.imfunc');
+        
+end
+
+
+
+
+
+

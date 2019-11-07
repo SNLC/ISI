@@ -1,0 +1,196 @@
+function [y s] = Gf0image(cond,Tlim,b,varargin)
+
+%Compute the F0 for each repeat of the desired condition.
+%
+%b is a 2D vector corresponding the the beginning and end of
+%the baseline subtraction images, in milliseconds. e.g. varargin = {[0 500]} sums
+%the images from 0 to .5 seconds for each repetition and then subtracts it
+%from the mean response in the repeat.
+%
+%Tlim is like b, but for the range over which images are averaged
+%
+%The first element of varargin is the pixel size, and the second is
+%the pixel location(s).
+
+%Compute mean images for each condition, within time limit vector 'Tlim' (ms)
+
+global ACQinfo
+
+[dum dum2 sync] = GetTrialData(1,1);  %Just to get some sync info
+imsize = length(sync(:,1));
+
+low = min(sync(:))
+high = max(sync(:));
+mid = (low(1)+high(1))/2;
+
+pepsetcondition(cond);
+nr = pepgetnorepeats;
+
+y1 = cell(1,nr);
+y2 = cell(1,nr);
+
+%Get sample period (ms/pixel)
+sp = 1000*ACQinfo.msPerLine/ACQinfo.pixelsPerLine %(msPerLine is actually sec/line)
+
+for r = 1:nr
+
+    [Ddum1 Ddum2 sync] = GetTrialData(cond,r);
+
+    sync = sign(sync-mid);
+
+    %idstart = find(sync(:)<0);  %Syncs are negative pulses?
+    %idstart = idstart(1);
+    idstart = 1;
+
+    avgstart = idstart+Tlim(1)/sp;
+    avgstop = idstart+Tlim(2)/sp;
+
+    imstart = ceil(avgstart/imsize);
+    imstop = ceil(avgstop/imsize);
+
+    y1{r+1} = mean(Ddum1(:,imstart:imstop),2);
+    y2{r+1} = mean(Ddum2(:,imstart:imstop),2);
+    
+    if length(inputs)==2 || bsflag == 1     %If the vector exists, then use it to do baseline sub.
+        
+        avgstart = idstart+Tlim(1)/sp;
+        avgstop = idstart+Tlim(2)/sp;
+
+        imstart = ceil(avgstart/imsize);
+        imstop = ceil(avgstop/imsize);
+
+        bimg1 = mean(Ddum1(:,imstart:imstop),2);
+        bimg2 = mean(Ddum2(:,imstart:imstop),2);
+        
+    end
+    
+    if bsflag == 1
+        y1{r+1} = y1{r+1} - bimg1;   %% baseline subtraction
+        y2{r+1} = y2{r+1} - bimg2;
+    end
+
+end
+
+
+rows = ACQinfo.linesPerFrame;
+cols = ACQinfo.pixelsPerLine;
+
+for r = 1:r
+    y1{r} = reshape(y1{r},rows,cols);
+    y2{r} = reshape(y2{r},rows,cols);
+end
+
+
+
+
+
+
+
+
+
+
+
+global pepANA bcond bsflag;
+
+pepsetcondition(cond);
+nr = pepgetnorepeats;
+
+inputs = varargin{1};
+
+if length(inputs)==2    %if we want to analyze a pixel.
+    N = length(inputs{1}(:,1));   %# of pixels;
+    ps = inputs{2};  %pixel size
+    pixels = inputs{1};  %Matrix of pixel locations; 1st column is y values
+    for i = 1:N
+        yr(i,:) = ((pixels(i,1):pixels(i,1)+ps-1))-floor(ps/2);   %yrange of first pixel
+        xr(i,:) = ((pixels(i,2):pixels(i,2)+ps-1))-floor(ps/2);   %xrange of first pixel
+    end
+else
+    s = [];
+end
+
+
+for(r=0:nr-1)
+    
+    pepsetrepeat(r);
+    ttag = pepgettimetag;
+
+    frames = pepgetframeidx(ttag,Tlim);    %% User limits. Returns same no. of values as 2nd arg.
+    frames(2) = min(frames(2),length(pepANA.imaging.isync));  %In case it is the last Cond/Repeat
+
+    if length(inputs)==2  %if pixel analyzer is on
+        allframes = pepgetframeidx(ttag,[0]);
+        sync = pepgetsync;
+        if isempty(bcond) %if bcond is empty, a blank condition does not exist
+            allframes(2) = pepgetframeidx(ttag,[sync(end)]); 
+        else  %if a blank condition exists then go to end of next time tag.
+            pepsettimetag(ttag+1)
+            bsync = pepgetsync;  %Get sync times for subsequent blank presentation
+            allframes(2) = pepgetframeidx(ttag+1,[bsync(end)]); 
+            pepsettimetag(ttag)  %Not sure if this is necessary
+        end
+    else
+        allframes = frames;
+    end
+    
+    k = 1;
+    h = 1;
+    for j = allframes(1):allframes(2);
+        img = peploadimage(j);    %signal gets inverted later
+       
+        %%%
+%         ref = img;
+%         ref = mean(ref(:));
+%         img = img/ref;
+        %%%
+        
+        %if ~isempty(img)  %In case of missing frames
+            if length(inputs)==2   %if we want to analyze a pixel.
+                for i = 1:N
+                    sig(i,h) = mean2(img(yr(i,:),xr(i,:)));
+                end
+            end
+            h = h+1;
+            %%%Sum images within the index window...
+            if j>=frames(1) & j<=frames(2)
+                if(k==1)
+                    acc = zeros(size(img));
+                end
+                acc = acc + img;
+                k = k+1;
+            end
+        %end
+    end
+
+    acc = acc ./ (k-1);
+
+    %%Baseline subtraction
+    if length(inputs)==2 || bsflag == 1     %If the vector exists, then use it to do baseline sub.
+        fbase = pepgetframeidx(ttag,b);
+        bimg = zeros(size(acc));
+        for(m=fbase(1):fbase(2))
+            bimg = bimg+peploadimage(m);
+        end
+        bimg = bimg/length(fbase(1):fbase(2));
+    end
+
+    if bsflag == 1
+        y{r+1} = 4096 - (acc - bimg);   %% baseline subtraction
+    else
+        y{r+1} = 4096 - acc;
+    end
+
+    if length(inputs)==2   %if we want to analyze pixels
+        for i = 1:N   %N is # of pixels to be analyzed
+            bdum = 4096 - mean2(bimg(yr(i,:),xr(i,:)));
+            sig(i,:) = ((4096-sig(i,:))-bdum)/bdum;
+        end
+        s{r+1} = sig;
+    end
+
+    clear sig
+
+end
+
+
+

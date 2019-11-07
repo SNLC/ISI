@@ -1,0 +1,7 @@
+function imageRGB(im,cvec)
+
+dim = size(Im1);
+Im1 = round(63*(Im1-min(Im1))./max(Im1) + 1);
+plotter = zeros(dim(1),dim(2),3);
+plotter(:,:,2) = Im1; 
+image(plotter)       %Load and plot frame

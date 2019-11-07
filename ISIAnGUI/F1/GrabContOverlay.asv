@@ -1,0 +1,74 @@
+function GrabContOverlay
+
+global ROIcrop IMGSIZE imstate Orunning parport
+
+global imagerhandles
+
+h = imagerhandles;
+
+grayid = gray;
+hsvid = jet;
+
+aw = 1-imstate.intRatio;  %anatomy weight of image (scalar)
+fw = imstate.intRatio;  %anatomy weight of image (scalar)
+
+mag = imstate.mag.*imstate.bw;
+mag = mag-min(mag(:));
+mag = mag/max(mag(:));
+
+imfunc = imstate.imfunc;
+imfunc = imfunc-min(imfunc(:));
+imfunc = imfunc/max(imfunc(:));
+imfunc = round(imfunc*63+1);
+
+zz = zeros(ROIcrop(3),ROIcrop(4),'uint16');
+h.mildig.Grab;
+h.mildig.GrabWait(3);
+n = 0;
+
+while Orunning
+    
+    n = n+1;
+
+    %Wait for grab to finish before switching the buffers
+    %h.mildig.GrabWait(3);
+    pause(.5)
+    
+    %Switch destination, then grab to it (asynchronously)
+    h.mildig.Image = h.buf{bitand(n,1)+1};
+    h.mildig.Grab;
+
+    %TTL pulse
+    putvalue(parport,1); putvalue(parport,0);
+
+    %Pull into Matlab workspace (but wait to save it)
+    imanat = h.buf{2-bitand(n,1)}.Get(zz,IMGSIZE^2,-1,ROIcrop(1),ROIcrop(2),ROIcrop(3),ROIcrop(4));
+    
+    imout = makeplotter(imanat,imfunc,mag,aw,fw,grayid,hsvid);
+    
+    figure(87)
+    image(imout)
+
+end
+
+function imout = makeplotter(imanat,imfunc,mag,aw,fw,grayid,hsvid)
+
+dim = size(imfunc);
+
+imanat = imanat-min(imanat(:));
+imanat = imanat/max(imanat(:));
+imanat = round(imanat*63+1);
+
+for i = 1:dim(1)
+    for j = 1:dim(2)
+        imout(i,j,:) = fw*mag(i,j)*hsvid(imfunc(i,j),:) + aw*grayid(imanat(i,j),:);       
+    end
+end
+imout = imout/max(imout(:));
+ 
+
+
+    
+
+    
+

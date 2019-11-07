@@ -1,0 +1,78 @@
+function [angx magx angy magy] = Gprocessret(f0dum,bw,hh)
+
+%f0dum is the cell array returned from fmeanimage.m
+%'retmap' is in degrees from 0 to 360
+
+k = 1;
+for(i=0:length(f0dum)-1)
+    pepsetcondition(i)
+    if(~pepblank)       %This loop filters out the blanks
+        v = pepgetvalues;
+        phase(k) = v(1);
+        ori(k) = v(2);
+        f0{k} = f0dum{i+1};
+        k = k+1;
+    end
+end
+
+for k = 1:length(f0)
+    %We must filter before combining the images from each
+    %condition because they are combined non-linearly.
+    %if a filter exists, use it...
+    if ~isempty(hh)
+        f0{k} = ifft2(fft2(hh).*fft2(f0{k}));    
+    end
+    if ori(k) == 0
+        Tens0(:,:,k) = f0{k};
+    elseif ori(k) == 90
+        retTens0(:,:,k) = f0{k};    
+    end
+end
+
+[ma idma] = max(sfTens,[],3);
+[mi idmi] = min(sfTens,[],3);
+
+mag = (ma-mi)./(ma+mi);
+sfmap = sf(idma);
+
+
+
+xpos = zeros(size(f0{1}));
+ypos = zeros(size(f0{1}));
+for k = 1:length(f0)
+    if ori(k) == 0
+        xpos = xpos + f0{k}*exp(1i*phase(k)*pi/180);    %Linear combination
+    elseif ori(k) == 90
+        ypos = ypos + f0{k}*exp(1i*phase(k)*pi/180);    %Linear combination
+    end
+end
+
+%if a filter exists, use it...
+if ~isempty(hh)
+    xpos = ifft2(fft2(hh).*fft2(xpos));
+    ypos = ifft2(fft2(hh).*fft2(ypos));
+end
+
+phasedomain = unique(phase);
+shifter = min(diff(phasedomain))/2;
+
+magx = abs(xpos);
+angx = angle(xpos*exp(1i*shifter*pi/180))*180/pi; %-180 to 180
+angx = angx + (1-sign(angx))*360/2; %0 to 360
+angx = 360-angx;  %x-axis runs from right to left
+
+magy = abs(ypos);
+angy = angle(ypos*exp(1i*shifter*pi/180))*180/pi;
+angy = angy + (1-sign(angy))*360/2;  %y-axis runs top to bottom
+
+magy = magy-min(magy(:));
+magy = magy/max(magy(:));
+magx = magx-min(magx(:));
+magx = magx/max(magx(:));
+
+
+angx = applyROI(bw,angx);
+angy = applyROI(bw,angy);
+magx = applyROI(bw,magx);
+magy = applyROI(bw,magy);
+

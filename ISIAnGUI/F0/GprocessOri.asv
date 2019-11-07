@@ -1,0 +1,75 @@
+function [orimap] = GprocessOri(f0dum,hh)
+
+global Analyzer
+%Each element of the cell array 'f0dum' is the average image for the
+%corresponding condition
+
+nc = length(Analyzer.loops.conds);
+
+%if blank exists, it is always the last condition
+bflag = 0;
+if strcmp(Analyzer.loops.conds{nc}.symbol,'blank')
+    bcond = nc;  
+    bflag = 1;
+end
+
+for i = 1:(nc-bflag)
+    
+    ori(i) = Analyzer.loops.conds{i};
+    
+end
+
+bflag = 0;
+k = 1;
+for(i=0:length(f0dum)-1)
+    pepsetcondition(i)
+    if(~pepblank)       %This loop filters out the blanks  
+        for z = 1:length(pepANA.listOfResults{i+1}.values)  %loop through each loop parameter
+            if strcmp(pepANA.listOfResults{i+1}.symbols(z),'ori')
+                paramID = z;
+            end
+        end
+        v = pepgetvalues;
+        ori(k) = v(paramID);
+        f0{k} = f0dum{i+1};
+        k = k+1;
+    else
+        f0blank = f0dum{i+1};
+        bflag = 1;
+    end
+end
+
+for k = 1:length(f0)
+    Tens(:,:,k) = f0{k};
+end
+
+mi = min(Tens,[],3);
+for k = 1:length(Tens(1,1,:))
+    if bflag == 1
+        Tens(:,:,k) = Tens(:,:,k)-f0blank;
+    else
+        Tens(:,:,k) = Tens(:,:,k)-mi;
+    end
+end
+
+% su = sum(abs(Tens),3);
+% for k = 1:length(Tens(1,1,:))
+%     Tens(:,:,k) = Tens(:,:,k)./su;
+% end
+
+% id = find(Tens(:)<0);
+% Tens(id) = 0;
+
+orimap = zeros(size(f0{1}));
+for k = 1:length(f0)
+    %orimap = orimap + f0{k}*exp(1i*2*ori(k)*pi/180);    %Linear combination
+    orimap = orimap + Tens(:,:,k)*exp(1i*2*ori(k)*pi/180);    %Linear combination
+end
+
+%if a filter exists, use it...
+if ~isempty(hh)
+    id = find(isnan(orimap));
+    orimap(id) = 0;
+    orimap = ifft2(abs(fft2(hh)).*fft2(orimap));    
+end
+

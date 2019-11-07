@@ -1,0 +1,139 @@
+function Gplotcolormap(mag,ang)
+
+global fh
+
+mag = mag-min(mag(:));
+mag = mag/max(mag(:));
+
+set(gcf,'Color',[1 1 1]);
+x = image(1:length(ang(:,1)),1:length(ang(1,:)),ang*64/(180),'CDataMapping','direct','AlphaData',mag,'AlphaDataMapping','none');
+
+axis image;
+colormap hsv;
+
+fh = gcf;
+colorbar('YTick',[1 16 32 48 64],'YTickLabel',{'L-M','S+(L-M)','S','S-(L-M)','L-M'})
+
+datacursormode on;
+dcm_obj = datacursormode(fh);
+set(dcm_obj,'DisplayStyle','window','SnapToDataVertex','on','UpdateFcn',@myupdatefcn);
+
+
+function txt = myupdatefcn(empt,event_obj)
+
+%Matlab doesn't like it when I try to input other things into myupdatefcn,
+%this is why I have these globals
+ 
+global ACQinfo Tens1 Tens2 f0m1 f0m2 bcond
+
+tdom = 0:length(Tens1{1}(1,1,:))-1;
+tdom = tdom*ACQinfo.msPerLine*ACQinfo.linesPerFrame;
+if isfield(ACQinfo,'stimPredelay')
+    predelay = ACQinfo.stimPredelay;
+    trialtime = ACQinfo.stimTrialtime;    
+    tdom = tdom-predelay;
+end
+
+rows = ACQinfo.linesPerFrame;
+cols = ACQinfo.pixelsPerLine;
+%  
+pos = get(event_obj,'Position'); %pos(1) is column dimension
+W = 5;
+xran = (pos(1)-floor(W/2)):(pos(1)+floor(W/2));
+yran = (pos(2)-floor(W/2)):(pos(2)+floor(W/2));
+
+tau = pos(2)*ACQinfo.msPerLine;
+tdom = tdom + tau;
+
+figure(99)
+
+bflag = 0;
+k = 1;
+for(i=0:length(f0m1)-1)
+    pepsetcondition(i)
+    if(~pepblank)       %This loop filters out the blanks
+        v = pepgetvalues;
+        colordom(k) = v(1);
+        dum1 = f0m1{i+1}(yran,xran);
+        dum2 = f0m2{i+1}(yran,xran);
+        tc1(i+1) = mean(dum1(:));
+        tc2(i+1) = mean(dum2(:));
+        k = k+1;
+    else        
+        dum1 = f0m1{i+1}(yran,xran);
+        dum2 = f0m2{i+1}(yran,xran);
+        blank1 = mean(dum1(:));
+        blank2 = mean(dum2(:));
+        tc1(i+1) = NaN;
+        tc2(i+1) = NaN; %need to do this in order to index the best/worst ori.    
+        bflag = 1;
+    end
+end
+
+[ma1 idma1] = max(tc1);
+[mi1 idmi1] = min(tc1);
+[ma2 idma2] = max(tc2);
+[mi2 idmi2] = min(tc2);
+tc1(find(isnan(tc1))) = []; %Get rid of blank index
+tc2(find(isnan(tc2))) = [];
+
+[colordom id] = sort(colordom);
+tc1 = tc1(id); tc2 = tc2(id);
+idLum = find(colordom == 9);  %Find luminance condition
+muLum1 = tc1(idLum); muLum2 = tc2(idLum);
+tc1(idLum) = []; tc2(idLum) = [];
+
+subplot(2,2,1)
+plot(tc1,'b'), hold on, plot([2.3 2.7],[muLum1 muLum1],'r'), 
+if bflag == 1
+    plot([2.3 2.7],[blank1 blank1],'k'),
+end
+plot(tc1,'ob'),hold off, 
+xlabel('IsoLuminance Axis'), title('Chan 1')
+set(gca,'XTick',1:length(tc1),'XTickLabel',{'L-M','S+(L-M)','S','S-(L-M)'})
+
+subplot(2,2,2)
+plot(tc2,'b'), hold on, plot([2.3 2.7],[muLum2 muLum2],'r'), 
+if bflag == 1
+    plot([2.3 2.7],[blank2 blank2],'k'),
+end
+plot(tc2,'ob'), hold off
+xlabel('IsoLuminance Axis'), title('Chan 2')
+set(gca,'XTick',1:length(tc2),'XTickLabel',{'L-M','S+(L-M)','S','S-(L-M)'})
+legend('isolum','lum','blank')
+
+nopix = length(yran)*length(xran);
+
+subplot(2,2,3)
+dum = squeeze(sum(sum(Tens1{idma1}(yran,xran,:),1),2))/nopix;
+plot(tdom(1:end-1),dum(1:end-1)), hold on, plot(tdom(1:end-1),dum(1:end-1),'o')
+hold on
+dum = squeeze(sum(sum(Tens1{idmi1}(yran,xran,:),1),2))/nopix;
+plot(tdom(1:end-1),dum(1:end-1),'r'), hold on, plot(tdom(1:end-1),dum(1:end-1),'or')
+if isfield(ACQinfo,'stimPredelay')
+    ylimits = get(gca,'Ylim');
+    hold on, plot([0 trialtime],[ylimits(1) ylimits(1)]+(ylimits(2)-ylimits(1))/10,'k')
+end
+hold off
+xlabel('sec')
+
+subplot(2,2,4)
+dum = squeeze(sum(sum(Tens2{idma2}(yran,xran,:),1),2))/nopix;
+plot(tdom(1:end-1),dum(1:end-1)), hold on, plot(tdom(1:end-1),dum(1:end-1),'o')
+hold on
+dum = squeeze(sum(sum(Tens2{idmi2}(yran,xran,:),1),2))/nopix;
+plot(tdom(1:end-1),dum(1:end-1),'r'), hold on, plot(tdom(1:end-1),dum(1:end-1),'or')
+if isfield(ACQinfo,'stimPredelay')
+    ylimits = get(gca,'Ylim');
+    hold on, plot([0 trialtime],[ylimits(1) ylimits(1)]+(ylimits(2)-ylimits(1))/10,'k')
+end
+hold off
+xlabel('sec')
+
+tar = get(get(event_obj,'Target'));
+data = tar.CData;
+
+txt = {['X: ',num2str(pos(1))],...
+       ['Y: ',num2str(pos(2))],...
+       ['Ori: ' sprintf('%2.1f %%',data(round(pos(2)),round(pos(1)))/64*180) ' deg']};
+       

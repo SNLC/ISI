@@ -1,0 +1,336 @@
+function varargout = OverlayGuide(varargin)
+% OVERLAYGUIDE M-file for OverlayGuide.fig
+%      OVERLAYGUIDE, by itself, creates a new OVERLAYGUIDE or raises the existing
+%      singleton*.
+%
+%      H = OVERLAYGUIDE returns the handle to a new OVERLAYGUIDE or the handle to
+%      the existing singleton*.
+%
+%      OVERLAYGUIDE('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in OVERLAYGUIDE.M with the given input arguments.
+%
+%      OVERLAYGUIDE('Property','Value',...) creates a new OVERLAYGUIDE or raises the
+%      existing singleton*.  Starting from the left, property value pairs are
+%      applied to the GUI before OverlayGuide_OpeningFcn gets called.  An
+%      unrecognized property name or invalid value makes property application
+%      stop.  All inputs are passed to OverlayGuide_OpeningFcn via varargin.
+%
+%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
+%      instance to run (singleton)".
+%
+% See also: GUIDE, GUIDATA, GUIHANDLES
+
+% Edit the above text to modify the response to help OverlayGuide
+
+% Last Modified by GUIDE v2.5 26-Aug-2009 15:42:58
+
+% Begin initialization code - DO NOT EDIT
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @OverlayGuide_OpeningFcn, ...
+                   'gui_OutputFcn',  @OverlayGuide_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDIT
+
+
+% --- Executes just before OverlayGuide is made visible.
+function OverlayGuide_OpeningFcn(hObject, eventdata, handles, varargin)
+% This function has no output args, see OutputFcn.
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% varargin   command line arguments to OverlayGuide (see VARARGIN)
+
+% Choose default command line output for OverlayGuide
+handles.output = hObject;
+
+% Update handles structure
+guidata(hObject, handles);
+
+% UIWAIT makes OverlayGuide wait for user response (see UIRESUME)
+% uiwait(handles.figure1);
+
+global PF1handles imstate Gtimer
+
+PF1handles = varargin{1};
+
+reset_imstate
+
+%construct a timer
+Gtimer = timer;
+set(Gtimer,'Period',0.5,'BusyMode','drop','ExecutionMode',...
+    'fixedSpacing','TimerFcn',@GrabContOverlay)
+
+if ~isfield(imstate,'imanat')
+    set(handles.intensitySlider,'enable','off')
+    set(handles.flipUpDown,'enable','off')
+    set(handles.flipLeftRight,'enable','off')
+    set(handles.rotateImage,'enable','off')
+end
+
+% --- Outputs from this function are returned to the command line.
+function varargout = OverlayGuide_OutputFcn(hObject, eventdata, handles) 
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+
+
+% --- Executes on button press in flipLeftRight.
+function flipLeftRight_Callback(hObject, eventdata, handles)
+% hObject    handle to flipLeftRight (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+resetImage('LR')
+
+if ishandle(86)
+    funcAnatomyPlot
+end
+
+% --- Executes on button press in flipUpDown.
+function flipUpDown_Callback(hObject, eventdata, handles)
+% hObject    handle to flipUpDown (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+resetImage('UD')
+
+if ishandle(86)
+    funcAnatomyPlot
+end
+
+% --- Executes on button press in rotateImage.
+function rotateImage_Callback(hObject, eventdata, handles)
+% hObject    handle to rotateImage (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+resetImage('rotate')
+
+if ishandle(86)
+    funcAnatomyPlot
+end
+
+
+% --- Executes on slider movement.
+function intensitySlider_Callback(hObject, eventdata, handles)
+% hObject    handle to intensitySlider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'Value') returns position of slider
+%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
+
+global imstate
+
+imstate.intRatio = get(handles.intensitySlider,'value');
+
+resetImage('')
+
+if ishandle(86)
+    funcAnatomyPlot
+end
+
+% --- Executes during object creation, after setting all properties.
+function intensitySlider_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to intensitySlider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: slider controls usually have a light gray background.
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+% --- Executes on button press in loadImage.
+function loadImage_Callback(hObject, eventdata, handles)
+% hObject    handle to loadImage (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global imstate
+
+reset_imstate
+
+[filename, pathname] = uigetfile('*.mat', 'Select a grab');
+S = load(strcat(pathname,filename));  %Returns the contents in the .mat under the structure S
+
+if isfield(S,'grab')
+    im = S.grab.img;
+else
+    im = S.im;
+end
+
+imstate.imanat = double(im);
+
+imstate.intRatio = .5;  %func/anatomy weight of image (scalar)
+set(handles.intensitySlider,'value',imstate.intRatio)
+
+set(handles.intensitySlider,'enable','on')
+set(handles.flipUpDown,'enable','on')
+set(handles.flipLeftRight,'enable','on')
+set(handles.rotateImage,'enable','on')
+
+% --- Executes on button press in plotStatic.
+function plotStatic_Callback(hObject, eventdata, handles)
+% hObject    handle to plotStatic (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+funcAnatomyPlot
+
+% --- Executes on button press in grabContOverlay.
+function grabContOverlay_Callback(hObject, eventdata, handles)
+% hObject    handle to grabContOverlay (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+global Gtimer h
+
+start(Gtimer)
+
+% --- Executes on button press in grabImage.
+function grabImage_Callback(hObject, eventdata, handles)
+% hObject    handle to grabImage (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+reset_imstate
+
+global imstate h IMGSIZE ROIcrop;
+
+h.mildig.set('GrabFrameEndEvent',0,'GrabEndEvent',...
+            0,'GrabStartEvent',0);
+
+img = zeros(ROIcrop(3),ROIcrop(4),'uint16');
+zz  = zeros(ROIcrop(3),ROIcrop(4),'uint16');
+img = h.milimg.Get(zz,IMGSIZE^2,-1,ROIcrop(1),ROIcrop(2),ROIcrop(3),ROIcrop(4));
+
+grab.img = img;       %% image
+grab.clock = clock;   %% time stamp
+figure(10);
+imagesc(grab.img'),axis off, colormap gray; truesize
+r = questdlg('Do you want to save this grab?','Single Grab','Yes','No','Yes');
+if(strcmp(r,'Yes'))
+    
+    grab.comment = inputdlg('Please enter description:','Image Grab',1,{'No description'},'on');
+
+    animal = get(findobj('Tag','animaltxt'),'String');
+    unit   = get(findobj('Tag','unittxt'),'String');
+    expt   = get(findobj('Tag','expttxt'),'String');
+    datadir= get(findobj('Tag','datatxt'),'String');
+    tag    = get(findobj('Tag','tagtxt'),'String');
+
+    dd = [datadir '\' lower(animal) '\grabs\'];
+    if(~exist(dd))
+        mkdir(dd);
+    end
+    fname = [dd 'grab_' lower(get(imagerhandles.animaltxt,'String')) '_' ...
+        get(imagerhandles.unittxt,'String') '_' ...
+        get(imagerhandles.expttxt,'String') '_' ...
+        datestr(now)];
+    fname = strrep(fname,' ','_');
+    fname = strrep(fname,':','_');
+    fname = strrep(fname,'-','_');
+    fname = [fname '.mat'];
+    fname(2) = ':';
+    save(fname,'grab');
+end
+delete(10);
+
+
+imstate.imanat = img;
+
+set(handles.intensitySlider,'enable','on')
+set(handles.flipUpDown,'enable','on')
+set(handles.flipLeftRight,'enable','on')
+set(handles.rotateImage,'enable','on')
+
+
+funcAna
+
+% --- Executes on button press in horRet.
+function horRet_Callback(hObject, eventdata, handles)
+% hObject    handle to horRet (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of horRet
+
+global imstate
+
+flag = get(handles.vertRet,'value');
+
+if ~flag  %if this button was already pressed don't do anything
+    set(handles.horRet,'value',1);
+else
+    imstate.imfunc = imstate.fmaps{1};;
+    set(handles.vertRet,'value',0);
+    funcAnatomyPlot
+end
+
+% --- Executes on button press in vertRet.
+function vertRet_Callback(hObject, eventdata, handles)
+% hObject    handle to vertRet (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of vertRet
+
+global imstate
+
+flag = get(handles.horRet,'value');
+
+if ~flag  %if this button was already pressed don't do anything
+    set(handles.vertRet,'value',1);
+else
+    imstate.imfunc = imstate.fmaps{2};
+    set(handles.horRet,'value',0);
+    funcAnatomyPlot
+end
+
+% --- Executes on button press in stopGrabbing.
+function stopGrabbing_Callback(hObject, eventdata, handles)
+% hObject    handle to stopGrabbing (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+global Gtimer
+
+stop(Gtimer)
+
+
+% --- Executes on button press in sigMag.
+function sigMag_Callback(hObject, eventdata, handles)
+% hObject    handle to sigMag (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of sigMag
+
+global imstate kmap_vert f1m
+
+val = get(handles.sigMag,'value');
+
+if val
+    imstate.mag = abs(f1m{1}) + abs(f1m{2});
+else
+    imstate.mag = imstate.bw;
+end
+
+funcAnatomyPlot
